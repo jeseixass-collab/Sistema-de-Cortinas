@@ -205,6 +205,13 @@
     text-transform:uppercase; letter-spacing:.04em; padding:2px 7px; border-radius:10px;
     background:var(--teal); color:#fff; margin-left:6px; vertical-align:middle;
   }
+
+  #print-area{display:none;}
+  @media print{
+    body *{visibility:hidden;}
+    #print-area, #print-area *{visibility:visible;}
+    #print-area{display:block; position:absolute; top:0; left:0; width:100%; padding:10px 20px;}
+  }
 </style>
 </head>
 <body>
@@ -230,8 +237,19 @@
       <h2><span class="n">01</span>Dados do orçamento</h2>
       <p class="sub">Preencha o essencial. Os cálculos de consumo, mão de obra e instalação são feitos automaticamente a partir dos cadastros.</p>
 
-      <div class="formgrid">
+      <div class="formgrid" style="border-bottom:1px solid var(--line); padding-bottom:16px; margin-bottom:6px;">
         <div class="field"><label>Cliente</label><input id="f-cliente" placeholder="Nome do cliente"></div>
+        <div class="field">
+          <label>Forma de pagamento</label>
+          <select id="f-pagamento">
+            <option value="prazo">A prazo (sem desconto)</option>
+            <option value="avista">À vista (10% desc. em tecido e forro)</option>
+          </select>
+        </div>
+      </div>
+      <p class="hint">Preencha o cliente e a forma de pagamento uma vez — depois adicione quantos cômodos precisar abaixo.</p>
+
+      <div class="formgrid">
         <div class="field">
           <label>Ambiente</label>
           <select id="f-ambiente">
@@ -288,7 +306,17 @@
         </div>
       </div>
 
-      <button class="btn thread" id="btn-calcular">Calcular orçamento</button>
+      <button class="btn thread" id="btn-add-comodo">+ Adicionar cômodo ao orçamento</button>
+
+      <div id="draft-wrap" style="display:none; margin-top:28px; border-top:2px solid var(--ink); padding-top:20px;">
+        <h2 style="border:none; padding-bottom:0;"><span class="n">02</span>Cômodos deste orçamento</h2>
+        <div class="orclist" id="draft-list" style="margin:14px 0;"></div>
+        <div style="display:flex; justify-content:space-between; align-items:center; font-family:'Avenir Next','Segoe UI',system-ui,sans-serif;">
+          <div style="font-size:13px; color:var(--ink-soft);">Total geral (todos os cômodos)</div>
+          <div style="font-size:20px; font-weight:700; color:var(--teal);" id="draft-total">R$ 0,00</div>
+        </div>
+        <button class="btn" id="btn-finalizar" style="margin-top:16px;">Finalizar orçamento</button>
+      </div>
 
       <div class="result" id="result" style="display:none;"></div>
     </div>
@@ -328,6 +356,8 @@
   </section>
 
 </main>
+
+<div id="print-area"></div>
 
 <script>
 /* ---------------------------------------------------------------
@@ -379,10 +409,11 @@ function seed(){
   ];
   DB.acessorios = [
     {id:uid(), nome:'Deslizante', unidade:'un', valor:1.2},
-    {id:uid(), nome:'Terminal', unidade:'un', valor:3.5},
+    {id:uid(), nome:'Terminal', unidade:'un', valor:7.0},
     {id:uid(), nome:'Ponteira', unidade:'un', valor:4.0},
     {id:uid(), nome:'Suporte', unidade:'un', valor:6.0},
-    {id:uid(), nome:'Fita Wave', unidade:'m', valor:8.5},
+    {id:uid(), nome:'Fita Wave', unidade:'m', valor:5.5},
+    {id:uid(), nome:'Entretela', unidade:'m', valor:2.5},
     {id:uid(), nome:'Tubo Suíço', unidade:'m', valor:22.0},
     {id:uid(), nome:'Ilhós', unidade:'un', valor:2.5},
   ];
@@ -650,8 +681,9 @@ function toggleModeloFields(){
 function round2(n){ return Math.round(n*100)/100; }
 function roundUp(n){ return Math.ceil(n); }
 
-function calcular(){
-  const cliente = document.getElementById('f-cliente').value.trim() || 'Cliente não informado';
+let draftComodos = [];
+
+function calcularComodo(){
   const ambiente = document.getElementById('f-ambiente').value;
   const largura = parseFloat(document.getElementById('f-largura').value);
   const altura = parseFloat(document.getElementById('f-altura').value);
@@ -667,18 +699,21 @@ function calcular(){
 
   if(!largura || !altura || !modelo || !tecido){
     alert('Preencha ao menos largura, altura, modelo e tecido.');
-    return;
+    return null;
   }
 
+  const formaPagamento = document.getElementById('f-pagamento').value;
+  const descontoPct = formaPagamento === 'avista' ? 0.10 : 0;
+
   const materiais = [];
-  let materialTotal = 0, maoObraTotal = 0, instalacaoTotal = 0;
+  let materialTotal = 0, maoObraTotal = 0, instalacaoTotal = 0, descontoTotal = 0;
   const avisos = [];
   let descTecnica = '', descComercial = '';
 
   if(modelo.tipo === 'cortina'){
     if(!trilho || !costureira || !instalador){
       alert('Para cortinas, selecione trilho, costureira e instalador.');
-      return;
+      return null;
     }
     if(costureira.modelos.length && !costureira.modelos.includes(modelo.nome)){
       avisos.push(`${costureira.nome} normalmente não confecciona ${modelo.nome}. Verifique antes de fechar o orçamento.`);
@@ -693,14 +728,18 @@ function calcular(){
     let consumoTecido = round2(metrosLineares * fatorEmenda);
 
     // Tecido
-    let valorTecido = round2(consumoTecido * tecido.valor);
-    materiais.push({nome:`Tecido — ${tecido.nome}`, qtd:`${consumoTecido} m`, valor:valorTecido});
+    let valorTecidoBruto = round2(consumoTecido * tecido.valor);
+    let valorTecido = round2(valorTecidoBruto * (1 - descontoPct));
+    if(descontoPct) descontoTotal += round2(valorTecidoBruto - valorTecido);
+    materiais.push({nome:`Tecido — ${tecido.nome}${descontoPct? ' (10% à vista)':''}`, qtd:`${consumoTecido} m`, valor:valorTecido});
     materialTotal += valorTecido;
 
     // Forro
     if(forro){
-      let valorForro = round2(consumoTecido * forro.valor);
-      materiais.push({nome:`Forro — ${forro.nome}`, qtd:`${consumoTecido} m`, valor:valorForro});
+      let valorForroBruto = round2(consumoTecido * forro.valor);
+      let valorForro = round2(valorForroBruto * (1 - descontoPct));
+      if(descontoPct) descontoTotal += round2(valorForroBruto - valorForro);
+      materiais.push({nome:`Forro — ${forro.nome}${descontoPct? ' (10% à vista)':''}`, qtd:`${consumoTecido} m`, valor:valorForro});
       materialTotal += valorForro;
     }
 
@@ -790,11 +829,13 @@ function calcular(){
     // PERSIANA — cálculo por área
     if(!instalador){
       alert('Selecione um instalador.');
-      return;
+      return null;
     }
     let area = round2(largura * altura);
-    let valorMaterial = round2(area * tecido.valor);
-    materiais.push({nome:`${tecido.nome}`, qtd:`${area} m²`, valor:valorMaterial});
+    let valorMaterialBruto = round2(area * tecido.valor);
+    let valorMaterial = round2(valorMaterialBruto * (1 - descontoPct));
+    if(descontoPct) descontoTotal += round2(valorMaterialBruto - valorMaterial);
+    materiais.push({nome:`${tecido.nome}${descontoPct? ' (10% à vista)':''}`, qtd:`${area} m²`, valor:valorMaterial});
     materialTotal += valorMaterial;
 
     instalacaoTotal = Math.max(round2(largura * instalador.valorMetro), instalador.valorMinimo);
@@ -805,45 +846,195 @@ function calcular(){
 
   const total = round2(materialTotal + maoObraTotal + instalacaoTotal);
 
-  const orcamento = {
-    id: uid(), data: new Date().toISOString(),
-    cliente, ambiente, largura, altura, modeloNome: modelo.nome,
+  return {
+    id: uid(), ambiente, largura, altura, modeloNome: modelo.nome,
     tecidoNome: tecido.nome, materiais, materialTotal, maoObraTotal, instalacaoTotal, total,
+    formaPagamento, descontoTotal,
     descTecnica, descComercial, obs, avisos
   };
-
-  renderResultado(orcamento);
-  DB.orcamentos.unshift(orcamento);
-  saveDB();
 }
 
-function renderResultado(o){
+function addComodo(){
+  const c = calcularComodo();
+  if(!c) return;
+  draftComodos.push(c);
+  renderDraft();
+  document.getElementById('f-largura').value = '';
+  document.getElementById('f-altura').value = '';
+  document.getElementById('f-obs').value = '';
+  document.getElementById('result').style.display = 'none';
+}
+
+function removeComodo(i){
+  draftComodos.splice(i,1);
+  renderDraft();
+}
+
+function renderDraft(){
+  const wrap = document.getElementById('draft-wrap');
+  if(!draftComodos.length){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  document.getElementById('draft-list').innerHTML = draftComodos.map((c,i)=>`
+    <div class="orccard">
+      <div>
+        <div class="who">${i+1}. ${c.ambiente} <span class="flag">${c.modeloNome}</span></div>
+        <div class="meta">${c.largura}m × ${c.altura}m</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div class="val">${money(c.total)}</div>
+        <button class="del-btn" onclick="removeComodo(${i})">remover</button>
+      </div>
+    </div>`).join('');
+  const totalGeral = round2(draftComodos.reduce((s,c)=>s+c.total,0));
+  document.getElementById('draft-total').textContent = money(totalGeral);
+}
+
+function finalizarOrcamento(){
+  const cliente = document.getElementById('f-cliente').value.trim();
+  if(!cliente){ alert('Informe o nome do cliente antes de finalizar.'); return; }
+  if(!draftComodos.length){ alert('Adicione ao menos um cômodo antes de finalizar.'); return; }
+
+  const formaPagamento = document.getElementById('f-pagamento').value;
+  const orcamento = {
+    id: uid(), data: new Date().toISOString(), cliente, formaPagamento,
+    comodos: draftComodos.slice(),
+    materialTotalGeral: round2(draftComodos.reduce((s,c)=>s+c.materialTotal,0)),
+    maoObraTotalGeral: round2(draftComodos.reduce((s,c)=>s+c.maoObraTotal,0)),
+    instalacaoTotalGeral: round2(draftComodos.reduce((s,c)=>s+c.instalacaoTotal,0)),
+    descontoTotalGeral: round2(draftComodos.reduce((s,c)=>s+c.descontoTotal,0)),
+    totalGeral: round2(draftComodos.reduce((s,c)=>s+c.total,0)),
+  };
+
+  DB.orcamentos.unshift(orcamento);
+  saveDB();
+  renderResultadoFinal(orcamento);
+
+  draftComodos = [];
+  renderDraft();
+  document.getElementById('f-cliente').value = '';
+}
+
+function renderResultadoFinal(o){
   const el = document.getElementById('result');
   el.style.display = 'block';
   el.innerHTML = `
-    <h2 style="border:none; padding-bottom:0;"><span class="n">✓</span>Orçamento — ${o.cliente}</h2>
-    <p class="sub">${o.ambiente} · ${o.modeloNome} · ${o.largura}m × ${o.altura}m</p>
-    ${o.avisos.length? `<div class="warn">${o.avisos.join('<br>')}</div>` : ''}
+    <h2 style="border:none; padding-bottom:0;"><span class="n">✓</span>Orçamento finalizado — ${o.cliente}</h2>
+    <p class="sub">${o.comodos.length} cômodo(s) · ${o.formaPagamento==='avista'? 'À vista' : 'A prazo'}</p>
     <div class="resultgrid">
       <div>
-        <ul class="matlist">
-          ${o.materiais.map(m=>`<li><span>${m.nome}</span><span class="qty">${m.qtd} — ${money(m.valor)}</span></li>`).join('')}
-        </ul>
-        <div class="desc-box"><span class="lbl">Descrição técnica</span>${o.descTecnica}</div>
-        <div class="desc-box"><span class="lbl">Descrição comercial</span>${o.descComercial}</div>
+        ${o.comodos.map(c=>`
+          <div style="margin-bottom:22px; padding-bottom:18px; border-bottom:1px dotted var(--line);">
+            <strong>${c.ambiente} — ${c.modeloNome}</strong>
+            ${c.avisos.length? `<div class="warn">${c.avisos.join('<br>')}</div>` : ''}
+            <ul class="matlist">
+              ${c.materiais.map(m=>`<li><span>${m.nome}</span><span class="qty">${m.qtd} — ${money(m.valor)}</span></li>`).join('')}
+            </ul>
+            <div class="desc-box"><span class="lbl">Descrição comercial</span>${c.descComercial}</div>
+            <div style="text-align:right; font-family:'Avenir Next','Segoe UI',system-ui,sans-serif; font-weight:700; margin-top:8px;">Subtotal: ${money(c.total)}</div>
+          </div>`).join('')}
       </div>
       <div>
         <div class="totalbox">
-          <div class="row"><span>Materiais</span><span>${money(o.materialTotal)}</span></div>
-          ${o.maoObraTotal? `<div class="row"><span>Mão de obra</span><span>${money(o.maoObraTotal)}</span></div>` : ''}
-          <div class="row"><span>Instalação</span><span>${money(o.instalacaoTotal)}</span></div>
-          <div class="grand"><span>Total <span class="stitch">Final</span></span><span>${money(o.total)}</span></div>
+          <div class="row"><span>Materiais</span><span>${money(o.materialTotalGeral)}</span></div>
+          ${o.maoObraTotalGeral? `<div class="row"><span>Mão de obra</span><span>${money(o.maoObraTotalGeral)}</span></div>` : ''}
+          <div class="row"><span>Instalação</span><span>${money(o.instalacaoTotalGeral)}</span></div>
+          ${o.descontoTotalGeral? `<div class="row"><span>Desconto à vista</span><span>− ${money(o.descontoTotalGeral)}</span></div>` : ''}
+          <div class="grand"><span>Total <span class="stitch">Geral</span></span><span>${money(o.totalGeral)}</span></div>
         </div>
+        <button class="btn ghost" style="margin-top:14px; width:100%;" onclick="imprimirOrcamento('${o.id}')">Imprimir orçamento</button>
       </div>
     </div>`;
 }
 
-document.getElementById('btn-calcular').addEventListener('click', calcular);
+document.getElementById('btn-add-comodo').addEventListener('click', addComodo);
+document.getElementById('btn-finalizar').addEventListener('click', finalizarOrcamento);
+
+/* ---------------------------------------------------------------
+   IMPRESSÃO
+--------------------------------------------------------------- */
+const TEXTO_PAGAMENTO = [
+  'Valor a prazo: parcelamento em até 10x no cartão.',
+  'Valor à vista: 50% acertado no fechamento do pedido e o restante após a instalação.',
+  'Valor à vista aberto para negociação.'
+];
+
+const TERMOS = [
+  '1. Nossos produtos possuem 01 ano de garantia contra defeito de fabricação.',
+  '2. Condições para manutenção da garantia: a garantia será automaticamente invalidada se o produto for lavado ou receber manutenção por outra empresa que não seja autorizada pela Loja Ambiente.',
+  '3. Para os pedidos feitos, não aceitamos desistência, pois o material entra em produção na sequência da efetivação da compra.',
+  '5. Caso haja valor em aberto, a não instalação do produto por parte do cliente dentro do prazo estabelecido acima não tira a responsabilidade do pagamento.',
+  '6. O prazo de entrega passa a contar após a medição final.',
+  '7. Os produtos podem apresentar alterações de cor diferentes das dos mostruários por conta do lote de fabricação.',
+  '8. Cortinas ou persianas motorizadas: o ambiente deve estar preparado com a parte elétrica para que seja executado o serviço de instalação. Não é de responsabilidade da loja a parte de instalação elétrica.',
+  '9. Este orçamento tem validade de 10 dias.'
+];
+
+function normalizeOrcamento(o){
+  if(o.comodos) return o;
+  // compatibilidade com orçamentos antigos (formato de um único cômodo)
+  return {
+    ...o,
+    comodos: [{ambiente:o.ambiente, modeloNome:o.modeloNome, largura:o.largura, altura:o.altura,
+      materiais:o.materiais, materialTotal:o.materialTotal, maoObraTotal:o.maoObraTotal,
+      instalacaoTotal:o.instalacaoTotal, descontoTotal:o.descontoTotal||0, total:o.total,
+      descComercial:o.descComercial, avisos:o.avisos||[]}],
+    totalGeral:o.total, materialTotalGeral:o.materialTotal, maoObraTotalGeral:o.maoObraTotal,
+    instalacaoTotalGeral:o.instalacaoTotal, descontoTotalGeral:o.descontoTotal||0
+  };
+}
+
+function buildPrintHTML(o){
+  const dataFmt = new Date(o.data).toLocaleDateString('pt-BR');
+  const comodosHtml = o.comodos.map((c,i)=>`
+    <div style="margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid #ccc;">
+      <div style="font-weight:bold; font-size:14px;">${i+1}. ${c.ambiente} — ${c.modeloNome}</div>
+      <div style="font-size:12px; font-style:italic; margin:4px 0;">${c.descComercial||''}</div>
+      <table style="width:100%; border-collapse:collapse; font-size:11.5px; margin-top:6px;">
+        ${c.materiais.map(m=>`<tr><td style="padding:2px 0;">${m.nome}</td><td style="text-align:right; padding:2px 0;">${m.qtd}</td><td style="text-align:right; padding:2px 0;">${money(m.valor)}</td></tr>`).join('')}
+        ${c.maoObraTotal? `<tr><td style="padding:2px 0;">Mão de obra</td><td></td><td style="text-align:right; padding:2px 0;">${money(c.maoObraTotal)}</td></tr>`:''}
+        <tr><td style="padding:2px 0;">Instalação</td><td></td><td style="text-align:right; padding:2px 0;">${money(c.instalacaoTotal)}</td></tr>
+        ${c.descontoTotal? `<tr><td style="padding:2px 0;">Desconto à vista</td><td></td><td style="text-align:right; padding:2px 0;">− ${money(c.descontoTotal)}</td></tr>`:''}
+      </table>
+      <div style="text-align:right; font-weight:bold; margin-top:6px; font-size:12.5px;">Subtotal ${c.ambiente}: ${money(c.total)}</div>
+    </div>`).join('');
+
+  return `
+    <div style="text-align:center; margin-bottom:18px; font-family:Georgia,serif;">
+      <div style="font-size:20px; font-weight:bold; letter-spacing:.5px;">LOJA AMBIENTE</div>
+      <div style="font-size:10.5px;">Rua Antônio Bertoncini, 135 - Bairro Cidade Alta - Araranguá/SC - CEP 88901-022</div>
+      <div style="font-size:10.5px;">(48) 3524-1574 / 99931-1574 · lojaambiente@hotmail.com</div>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:14px; font-family:Georgia,serif;">
+      <div><strong>Cliente:</strong> ${o.cliente}</div>
+      <div><strong>Data:</strong> ${dataFmt}</div>
+    </div>
+    <div style="font-size:12.5px; margin-bottom:16px; font-family:Georgia,serif;"><strong>Forma de pagamento escolhida:</strong> ${o.formaPagamento==='avista'? 'À vista' : 'A prazo'}</div>
+    <h3 style="border-bottom:1px solid #000; padding-bottom:4px; font-family:Georgia,serif;">Itens do orçamento</h3>
+    ${comodosHtml}
+    <div style="text-align:right; font-size:17px; font-weight:bold; margin:16px 0; border-top:2px solid #000; padding-top:10px; font-family:Georgia,serif;">
+      VALOR TOTAL: ${money(o.totalGeral)}
+    </div>
+    <h3 style="border-bottom:1px solid #000; padding-bottom:4px; margin-top:22px; font-family:Georgia,serif;">Condições de pagamento</h3>
+    <div style="font-size:11.5px; font-family:Georgia,serif;">
+      ${TEXTO_PAGAMENTO.map(t=>`<p style="margin:3px 0;">${t}</p>`).join('')}
+    </div>
+    <h3 style="border-bottom:1px solid #000; padding-bottom:4px; margin-top:20px; font-family:Georgia,serif;">Termos e condições</h3>
+    <div style="font-size:10.5px; font-family:Georgia,serif;">
+      ${TERMOS.map(t=>`<p style="margin:5px 0;">${t}</p>`).join('')}
+    </div>
+    <div style="margin-top:44px; display:flex; justify-content:space-between; font-size:11.5px; font-family:Georgia,serif;">
+      <div>_____________________________<br>Vendedor(a)</div>
+      <div>_____________________________<br>Cliente</div>
+    </div>`;
+}
+
+function imprimirOrcamento(id){
+  const raw = DB.orcamentos.find(o=>o.id===id);
+  if(!raw) return;
+  const o = normalizeOrcamento(raw);
+  document.getElementById('print-area').innerHTML = buildPrintHTML(o);
+  window.print();
+}
 
 /* ---------------------------------------------------------------
    ORÇAMENTOS SALVOS
@@ -851,17 +1042,23 @@ document.getElementById('btn-calcular').addEventListener('click', calcular);
 function renderOrcamentos(){
   const el = document.getElementById('orclist');
   if(!DB.orcamentos.length){
-    el.innerHTML = '<div class="empty">Nenhum orçamento calculado ainda.</div>';
+    el.innerHTML = '<div class="empty">Nenhum orçamento salvo ainda.</div>';
     return;
   }
-  el.innerHTML = DB.orcamentos.map(o=>`
+  el.innerHTML = DB.orcamentos.map(raw=>{
+    const o = normalizeOrcamento(raw);
+    return `
     <div class="orccard">
       <div>
-        <div class="who">${o.cliente} <span class="flag">${o.modeloNome}</span></div>
-        <div class="meta">${o.ambiente} · ${o.largura}m × ${o.altura}m · ${new Date(o.data).toLocaleDateString('pt-BR')}</div>
+        <div class="who">${o.cliente} <span class="flag">${o.comodos.length} cômodo${o.comodos.length>1?'s':''}</span></div>
+        <div class="meta">${o.comodos.map(c=>c.ambiente).join(', ')} · ${new Date(o.data).toLocaleDateString('pt-BR')}</div>
       </div>
-      <div class="val">${money(o.total)}</div>
-    </div>`).join('');
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div class="val">${money(o.totalGeral)}</div>
+        <button class="btn small ghost" onclick="imprimirOrcamento('${raw.id}')">Imprimir</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 /* ---------------------------------------------------------------
