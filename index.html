@@ -238,16 +238,9 @@
       <p class="sub">Preencha o essencial. Os cálculos de consumo, mão de obra e instalação são feitos automaticamente a partir dos cadastros.</p>
 
       <div class="formgrid" style="border-bottom:1px solid var(--line); padding-bottom:16px; margin-bottom:6px;">
-        <div class="field"><label>Cliente</label><input id="f-cliente" placeholder="Nome do cliente"></div>
-        <div class="field">
-          <label>Forma de pagamento</label>
-          <select id="f-pagamento">
-            <option value="prazo">A prazo (sem desconto)</option>
-            <option value="avista">À vista (10% desc. em tecido e forro)</option>
-          </select>
-        </div>
+        <div class="field full"><label>Cliente</label><input id="f-cliente" placeholder="Nome do cliente"></div>
       </div>
-      <p class="hint">Preencha o cliente e a forma de pagamento uma vez — depois adicione quantos cômodos precisar abaixo.</p>
+      <p class="hint">Preencha o cliente uma vez — depois adicione quantos cômodos precisar abaixo. O orçamento final mostra automaticamente as duas opções de pagamento (à vista e a prazo) para o cliente escolher.</p>
 
       <div class="formgrid">
         <div class="field">
@@ -405,7 +398,7 @@ function seed(){
     {id:uid(), nome:'Gina', valorSemForro:50, acrescimoForro:28, modelos:['Cortina Wave','Cortina Prega Americana'], alturaMax:4.0},
   ];
   DB.instaladores = [
-    {id:uid(), nome:'Marquinhos', valorMetro:15, valorMinimo:80, valorDeslocamento:150, obs:'Atende toda a região'},
+    {id:uid(), nome:'Marquinhos', valorMetro:58, valorMinimo:80, valorDeslocamento:150, obs:'Atende toda a região'},
   ];
   DB.acessorios = [
     {id:uid(), nome:'Deslizante', unidade:'un', valor:1.2},
@@ -486,14 +479,16 @@ function renderTrilhos(){
   const el = document.getElementById('cad-trilhos');
   let rows = DB.trilhos.map(t=>`
     <tr><td>${t.nome}</td><td class="num">${money(t.valorMetro)}/m</td>
-    <td class="num">${t.espSuportes} m</td><td class="num">${t.qtdTerminais}</td><td class="num">${t.qtdPonteiras}</td>
+    <td class="num">${t.usaSuportes===false? 'Não usa' : t.espSuportes+' m'}</td><td class="num">${t.qtdTerminais}</td><td class="num">${t.qtdPonteiras}</td>
     <td><button class="del-btn" onclick="delItem('trilhos','${t.id}')">remover</button></td></tr>`).join('');
   el.innerHTML = `
     <table><thead><tr><th>Nome</th><th>Valor/m</th><th>Espaç. suportes</th><th>Terminais</th><th>Ponteiras</th><th></th></tr></thead>
     <tbody>${rows || '<tr><td colspan="6" class="empty">Nenhum trilho cadastrado</td></tr>'}</tbody></table>
+    <p class="hint">O comprimento do trilho e da fita Wave é sempre a largura da janela arredondada para os 10cm acima (ex: 3,66m → 3,70m).</p>
     <div class="formgrid">
       <div class="field"><label>Nome</label><input id="ntr-nome" placeholder="ex: Trilho Suíço Triplo"></div>
       <div class="field"><label>Valor por metro (R$)</label><input id="ntr-valor" type="number" step="0.01" min="0"></div>
+      <div class="field"><label>Usa suportes cobrados à parte?</label><select id="ntr-usasup"><option value="true">Sim</option><option value="false">Não</option></select></div>
       <div class="field"><label>Espaçamento entre suportes (m)</label><input id="ntr-esp" type="number" step="0.1" value="0.6"></div>
       <div class="field"><label>Terminais (un, fixo)</label><input id="ntr-term" type="number" value="2"></div>
       <div class="field"><label>Ponteiras (un, fixo)</label><input id="ntr-pont" type="number" value="2"></div>
@@ -505,6 +500,7 @@ function addTrilho(){
   const valorMetro=parseFloat(document.getElementById('ntr-valor').value);
   if(!nome||!valorMetro){ alert('Informe nome e valor.'); return; }
   DB.trilhos.push({id:uid(), nome, valorMetro,
+    usaSuportes:document.getElementById('ntr-usasup').value==='true',
     espSuportes:parseFloat(document.getElementById('ntr-esp').value)||0.6,
     qtdTerminais:parseInt(document.getElementById('ntr-term').value)||0,
     qtdPonteiras:parseInt(document.getElementById('ntr-pont').value)||0});
@@ -688,6 +684,8 @@ function toggleModeloFields(){
 --------------------------------------------------------------- */
 function round2(n){ return Math.round(n*100)/100; }
 function roundUp(n){ return Math.ceil(n); }
+function roundUp10cm(n){ return Math.ceil(n*10)/10; }
+function roundUpEven(n){ let c = Math.ceil(n); return c % 2 === 0 ? c : c + 1; }
 function listaPt(arr){
   if(!arr.length) return '';
   if(arr.length===1) return arr[0];
@@ -715,8 +713,7 @@ function calcularComodo(){
     return null;
   }
 
-  const formaPagamento = document.getElementById('f-pagamento').value;
-  const descontoPct = formaPagamento === 'avista' ? 0.10 : 0;
+  const DESCONTO_AVISTA_PCT = 0.10; // aplicado apenas em tecido/forro, sempre calculado como opção
 
   const materiais = [];
   let materialTotal = 0, maoObraTotal = 0, instalacaoTotal = 0, descontoTotal = 0;
@@ -740,34 +737,32 @@ function calcularComodo(){
     let consumoTecido = round2(metrosFranzido + reporte);
     let consumoForro = metrosFranzido; // forro não leva bainha/reporte
 
-    // Tecido
-    let valorTecidoBruto = round2(consumoTecido * tecido.valor);
-    let valorTecido = round2(valorTecidoBruto * (1 - descontoPct));
-    if(descontoPct) descontoTotal += round2(valorTecidoBruto - valorTecido);
-    materiais.push({nome:`Tecido — ${tecido.nome}${descontoPct? ' (10% à vista)':''}`, qtd:`${consumoTecido} m (${metrosFranzido}m franzido + ${reporte}m bainha)`, valor:valorTecido});
+    // Tecido (preço cheio — o desconto à vista é calculado à parte, no total)
+    let valorTecido = round2(consumoTecido * tecido.valor);
+    descontoTotal += round2(valorTecido * DESCONTO_AVISTA_PCT);
+    materiais.push({nome:`Tecido — ${tecido.nome}`, qtd:`${consumoTecido} m (${metrosFranzido}m franzido + ${reporte}m bainha)`, valor:valorTecido});
     materialTotal += valorTecido;
 
     // Forro
     if(forro){
-      let valorForroBruto = round2(consumoForro * forro.valor);
-      let valorForro = round2(valorForroBruto * (1 - descontoPct));
-      if(descontoPct) descontoTotal += round2(valorForroBruto - valorForro);
-      materiais.push({nome:`Forro — ${forro.nome}${descontoPct? ' (10% à vista)':''}`, qtd:`${consumoForro} m`, valor:valorForro});
+      let valorForro = round2(consumoForro * forro.valor);
+      descontoTotal += round2(valorForro * DESCONTO_AVISTA_PCT);
+      materiais.push({nome:`Forro — ${forro.nome}`, qtd:`${consumoForro} m`, valor:valorForro});
       materialTotal += valorForro;
     }
 
     // Entretela (acompanha exatamente o tecido)
     const entretela = DB.acessorios.find(a=>a.nome.toLowerCase()==='entretela');
     if(entretela){
-      let v = round2(consumoTecido * entretela.valor);
-      materiais.push({nome:'Entretela', qtd:`${consumoTecido} m`, valor:v});
+      let v = round2(metrosFranzido * entretela.valor);
+      materiais.push({nome:'Entretela', qtd:`${metrosFranzido} m`, valor:v});
       materialTotal += v;
     }
 
     // Fita Wave
     if(modelo.usaFitaWave){
       const fita = DB.acessorios.find(a=>a.nome.toLowerCase().includes('wave'));
-      let metrosFita = roundUp(metrosFranzido);
+      let metrosFita = roundUp10cm(largura);
       if(fita){
         let v = round2(metrosFita * fita.valor);
         materiais.push({nome:'Fita Wave', qtd:`${metrosFita} m`, valor:v});
@@ -786,10 +781,10 @@ function calcularComodo(){
       }
     }
 
-    // Deslizantes (para wave/varão)
+    // Deslizantes (para wave/varão) — largura do varão ÷ 0,07 × 2
     if(modelo.espDeslizante>0){
       const desl = DB.acessorios.find(a=>a.nome.toLowerCase()==='deslizante');
-      let qtdDesl = roundUp(metrosFranzido / modelo.espDeslizante);
+      let qtdDesl = roundUpEven((largura / 0.07) * 2);
       if(desl){
         let v = round2(qtdDesl * desl.valor);
         materiais.push({nome:'Deslizantes', qtd:`${qtdDesl} un`, valor:v});
@@ -798,17 +793,20 @@ function calcularComodo(){
     }
 
     // Trilho
-    let valorTrilho = round2(largura * trilho.valorMetro);
-    materiais.push({nome:`Trilho — ${trilho.nome}`, qtd:`${round2(largura)} m`, valor:valorTrilho});
+    let metrosTrilho = roundUp10cm(largura);
+    let valorTrilho = round2(metrosTrilho * trilho.valorMetro);
+    materiais.push({nome:`Trilho — ${trilho.nome}`, qtd:`${metrosTrilho} m`, valor:valorTrilho});
     materialTotal += valorTrilho;
 
-    // Suportes
-    const suporte = DB.acessorios.find(a=>a.nome.toLowerCase()==='suporte');
-    let qtdSuportes = roundUp(largura / (trilho.espSuportes||0.6)) + 1;
-    if(suporte){
-      let v = round2(qtdSuportes * suporte.valor);
-      materiais.push({nome:'Suportes', qtd:`${qtdSuportes} un`, valor:v});
-      materialTotal += v;
+    // Suportes (alguns trilhos, como varão/trilho simples, não usam)
+    if(trilho.usaSuportes !== false){
+      const suporte = DB.acessorios.find(a=>a.nome.toLowerCase()==='suporte');
+      let qtdSuportes = roundUp(largura / (trilho.espSuportes||0.6)) + 1;
+      if(suporte){
+        let v = round2(qtdSuportes * suporte.valor);
+        materiais.push({nome:'Suportes', qtd:`${qtdSuportes} un`, valor:v});
+        materialTotal += v;
+      }
     }
 
     // Terminais e ponteiras (por folha)
@@ -833,7 +831,7 @@ function calcularComodo(){
     maoObraTotal = round2(mo);
 
     // Instalação
-    instalacaoTotal = Math.max(round2(largura * instalador.valorMetro), instalador.valorMinimo) + (instalador.valorDeslocamento||0);
+    instalacaoTotal = Math.max(round2(roundUp10cm(largura) * instalador.valorMetro), instalador.valorMinimo) + (instalador.valorDeslocamento||0);
 
     descTecnica = `${modelo.nome} — largura ${largura}m x altura ${altura}m, ${folhas} folha(s), abertura ${abertura.toLowerCase()}. Tecido: ${tecido.nome} (${consumoTecido}m). ${forro? 'Forro: '+forro.nome+'. ':''}Trilho: ${trilho.nome}. Confecção: ${costureira.nome}. Instalação: ${instalador.nome}.`;
 
@@ -852,24 +850,24 @@ function calcularComodo(){
       return null;
     }
     let area = round2(largura * altura);
-    let valorMaterialBruto = round2(area * tecido.valor);
-    let valorMaterial = round2(valorMaterialBruto * (1 - descontoPct));
-    if(descontoPct) descontoTotal += round2(valorMaterialBruto - valorMaterial);
-    materiais.push({nome:`${tecido.nome}${descontoPct? ' (10% à vista)':''}`, qtd:`${area} m²`, valor:valorMaterial});
+    let valorMaterial = round2(area * tecido.valor);
+    descontoTotal += round2(valorMaterial * DESCONTO_AVISTA_PCT);
+    materiais.push({nome:`${tecido.nome}`, qtd:`${area} m²`, valor:valorMaterial});
     materialTotal += valorMaterial;
 
-    instalacaoTotal = Math.max(round2(largura * instalador.valorMetro), instalador.valorMinimo) + (instalador.valorDeslocamento||0);
+    instalacaoTotal = Math.max(round2(roundUp10cm(largura) * instalador.valorMetro), instalador.valorMinimo) + (instalador.valorDeslocamento||0);
 
     descTecnica = `${modelo.nome} — largura ${largura}m x altura ${altura}m (${area} m²). Material: ${tecido.nome}. Instalação: ${instalador.nome}.`;
     descComercial = `${modelo.nome} confeccionada em ${tecido.nome.toLowerCase()}, sob medida, incluindo material, acessórios de fixação e instalação completa.`;
   }
 
-  const total = round2(materialTotal + maoObraTotal + instalacaoTotal);
+  const totalPrazo = round2(materialTotal + maoObraTotal + instalacaoTotal);
+  const totalAvista = round2(totalPrazo - descontoTotal);
 
   return {
     id: uid(), ambiente, largura, altura, modeloNome: modelo.nome,
-    tecidoNome: tecido.nome, materiais, materialTotal, maoObraTotal, instalacaoTotal, total,
-    formaPagamento, descontoTotal,
+    tecidoNome: tecido.nome, materiais, materialTotal, maoObraTotal, instalacaoTotal,
+    descontoTotal, totalPrazo, totalAvista,
     descTecnica, descComercial, obs, avisos
   };
 }
@@ -901,11 +899,11 @@ function renderDraft(){
         <div class="meta">${c.largura}m × ${c.altura}m</div>
       </div>
       <div style="display:flex; align-items:center; gap:12px;">
-        <div class="val">${money(c.total)}</div>
+        <div class="val">${money(c.totalPrazo)}</div>
         <button class="del-btn" onclick="removeComodo(${i})">remover</button>
       </div>
     </div>`).join('');
-  const totalGeral = round2(draftComodos.reduce((s,c)=>s+c.total,0));
+  const totalGeral = round2(draftComodos.reduce((s,c)=>s+c.totalPrazo,0));
   document.getElementById('draft-total').textContent = money(totalGeral);
 }
 
@@ -914,15 +912,15 @@ function finalizarOrcamento(){
   if(!cliente){ alert('Informe o nome do cliente antes de finalizar.'); return; }
   if(!draftComodos.length){ alert('Adicione ao menos um cômodo antes de finalizar.'); return; }
 
-  const formaPagamento = document.getElementById('f-pagamento').value;
   const orcamento = {
-    id: uid(), data: new Date().toISOString(), cliente, formaPagamento,
+    id: uid(), data: new Date().toISOString(), cliente,
     comodos: draftComodos.slice(),
     materialTotalGeral: round2(draftComodos.reduce((s,c)=>s+c.materialTotal,0)),
     maoObraTotalGeral: round2(draftComodos.reduce((s,c)=>s+c.maoObraTotal,0)),
     instalacaoTotalGeral: round2(draftComodos.reduce((s,c)=>s+c.instalacaoTotal,0)),
     descontoTotalGeral: round2(draftComodos.reduce((s,c)=>s+c.descontoTotal,0)),
-    totalGeral: round2(draftComodos.reduce((s,c)=>s+c.total,0)),
+    totalGeralPrazo: round2(draftComodos.reduce((s,c)=>s+c.totalPrazo,0)),
+    totalGeralAvista: round2(draftComodos.reduce((s,c)=>s+c.totalAvista,0)),
   };
 
   DB.orcamentos.unshift(orcamento);
@@ -939,7 +937,7 @@ function renderResultadoFinal(o){
   el.style.display = 'block';
   el.innerHTML = `
     <h2 style="border:none; padding-bottom:0;"><span class="n">✓</span>Orçamento finalizado — ${o.cliente}</h2>
-    <p class="sub">${o.comodos.length} cômodo(s) · ${o.formaPagamento==='avista'? 'À vista' : 'A prazo'}</p>
+    <p class="sub">${o.comodos.length} cômodo(s)</p>
     <div class="resultgrid">
       <div>
         ${o.comodos.map(c=>`
@@ -950,7 +948,7 @@ function renderResultadoFinal(o){
               ${c.materiais.map(m=>`<li><span>${m.nome}</span><span class="qty">${m.qtd} — ${money(m.valor)}</span></li>`).join('')}
             </ul>
             <div class="desc-box"><span class="lbl">Descrição comercial</span>${c.descComercial}</div>
-            <div style="text-align:right; font-family:'Avenir Next','Segoe UI',system-ui,sans-serif; font-weight:700; margin-top:8px;">Subtotal: ${money(c.total)}</div>
+            <div style="text-align:right; font-family:'Avenir Next','Segoe UI',system-ui,sans-serif; font-weight:700; margin-top:8px;">Subtotal a prazo: ${money(c.totalPrazo)}</div>
           </div>`).join('')}
       </div>
       <div>
@@ -958,8 +956,9 @@ function renderResultadoFinal(o){
           <div class="row"><span>Materiais</span><span>${money(o.materialTotalGeral)}</span></div>
           ${o.maoObraTotalGeral? `<div class="row"><span>Mão de obra</span><span>${money(o.maoObraTotalGeral)}</span></div>` : ''}
           <div class="row"><span>Instalação</span><span>${money(o.instalacaoTotalGeral)}</span></div>
-          ${o.descontoTotalGeral? `<div class="row"><span>Desconto à vista</span><span>− ${money(o.descontoTotalGeral)}</span></div>` : ''}
-          <div class="grand"><span>Total <span class="stitch">Geral</span></span><span>${money(o.totalGeral)}</span></div>
+          <div class="grand"><span>A prazo <span class="stitch">até 10x</span></span><span>${money(o.totalGeralPrazo)}</span></div>
+          <div class="row" style="margin-top:8px;"><span>Desconto à vista (tecido/forro)</span><span>− ${money(o.descontoTotalGeral)}</span></div>
+          <div class="grand"><span>À <span class="stitch">Vista</span></span><span>${money(o.totalGeralAvista)}</span></div>
         </div>
         <button class="btn ghost" style="margin-top:14px; width:100%;" onclick="imprimirOrcamento('${o.id}')">Imprimir orçamento</button>
       </div>
@@ -996,9 +995,11 @@ function normalizeOrcamento(o){
     ...o,
     comodos: [{ambiente:o.ambiente, modeloNome:o.modeloNome, largura:o.largura, altura:o.altura,
       materiais:o.materiais, materialTotal:o.materialTotal, maoObraTotal:o.maoObraTotal,
-      instalacaoTotal:o.instalacaoTotal, descontoTotal:o.descontoTotal||0, total:o.total,
+      instalacaoTotal:o.instalacaoTotal, descontoTotal:o.descontoTotal||0,
+      totalPrazo:o.totalPrazo||o.total, totalAvista:o.totalAvista||round2((o.totalPrazo||o.total)-(o.descontoTotal||0)),
       descComercial:o.descComercial, avisos:o.avisos||[]}],
-    totalGeral:o.total, materialTotalGeral:o.materialTotal, maoObraTotalGeral:o.maoObraTotal,
+    totalGeralPrazo:o.totalPrazo||o.total, totalGeralAvista:o.totalAvista||round2((o.totalPrazo||o.total)-(o.descontoTotal||0)),
+    materialTotalGeral:o.materialTotal, maoObraTotalGeral:o.maoObraTotal,
     instalacaoTotalGeral:o.instalacaoTotal, descontoTotalGeral:o.descontoTotal||0
   };
 }
@@ -1013,9 +1014,8 @@ function buildPrintHTML(o){
         ${c.materiais.map(m=>`<tr><td style="padding:2px 0;">${m.nome}</td><td style="text-align:right; padding:2px 0;">${m.qtd}</td><td style="text-align:right; padding:2px 0;">${money(m.valor)}</td></tr>`).join('')}
         ${c.maoObraTotal? `<tr><td style="padding:2px 0;">Mão de obra</td><td></td><td style="text-align:right; padding:2px 0;">${money(c.maoObraTotal)}</td></tr>`:''}
         <tr><td style="padding:2px 0;">Instalação</td><td></td><td style="text-align:right; padding:2px 0;">${money(c.instalacaoTotal)}</td></tr>
-        ${c.descontoTotal? `<tr><td style="padding:2px 0;">Desconto à vista</td><td></td><td style="text-align:right; padding:2px 0;">− ${money(c.descontoTotal)}</td></tr>`:''}
       </table>
-      <div style="text-align:right; font-weight:bold; margin-top:6px; font-size:12.5px;">Subtotal ${c.ambiente}: ${money(c.total)}</div>
+      <div style="text-align:right; font-weight:bold; margin-top:6px; font-size:12.5px;">Subtotal a prazo ${c.ambiente}: ${money(c.totalPrazo)}</div>
     </div>`).join('');
 
   return `
@@ -1028,11 +1028,15 @@ function buildPrintHTML(o){
       <div><strong>Cliente:</strong> ${o.cliente}</div>
       <div><strong>Data:</strong> ${dataFmt}</div>
     </div>
-    <div style="font-size:12.5px; margin-bottom:16px; font-family:Georgia,serif;"><strong>Forma de pagamento escolhida:</strong> ${o.formaPagamento==='avista'? 'À vista' : 'A prazo'}</div>
     <h3 style="border-bottom:1px solid #000; padding-bottom:4px; font-family:Georgia,serif;">Itens do orçamento</h3>
     ${comodosHtml}
-    <div style="text-align:right; font-size:17px; font-weight:bold; margin:16px 0; border-top:2px solid #000; padding-top:10px; font-family:Georgia,serif;">
-      VALOR TOTAL: ${money(o.totalGeral)}
+    <div style="margin:18px 0; border-top:2px solid #000; padding-top:12px; font-family:Georgia,serif;">
+      <div style="display:flex; justify-content:space-between; font-size:15px; margin-bottom:4px;">
+        <span>Valor a prazo (até 10x no cartão):</span><strong>${money(o.totalGeralPrazo)}</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:15px; color:#8C2F1E;">
+        <span>Valor à vista (10% desc. em tecido/forro):</span><strong>${money(o.totalGeralAvista)}</strong>
+      </div>
     </div>
     <h3 style="border-bottom:1px solid #000; padding-bottom:4px; margin-top:22px; font-family:Georgia,serif;">Condições de pagamento</h3>
     <div style="font-size:11.5px; font-family:Georgia,serif;">
@@ -1074,7 +1078,7 @@ function renderOrcamentos(){
         <div class="meta">${o.comodos.map(c=>c.ambiente).join(', ')} · ${new Date(o.data).toLocaleDateString('pt-BR')}</div>
       </div>
       <div style="display:flex; align-items:center; gap:12px;">
-        <div class="val">${money(o.totalGeral)}</div>
+        <div class="val">${money(o.totalGeralPrazo)} <span style="font-size:11px; color:var(--ink-soft); font-weight:400;">(à vista ${money(o.totalGeralAvista)})</span></div>
         <button class="btn small ghost" onclick="imprimirOrcamento('${raw.id}')">Imprimir</button>
       </div>
     </div>`;
