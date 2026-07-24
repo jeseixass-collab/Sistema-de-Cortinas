@@ -289,7 +289,7 @@
           <label>Tipo de abertura</label>
           <select id="f-abertura"><option>Central</option><option>Esquerda</option><option>Direita</option></select>
         </div>
-        <div class="field">
+        <div class="field" id="wrap-costureira">
           <label>Costureira</label>
           <select id="f-costureira"></select>
         </div>
@@ -405,7 +405,7 @@ function seed(){
     {id:uid(), nome:'Gina', valorSemForro:50, acrescimoForro:28, modelos:['Cortina Wave','Cortina Prega Americana'], alturaMax:4.0},
   ];
   DB.instaladores = [
-    {id:uid(), nome:'Marquinhos', valorMetro:15, valorMinimo:80, obs:'Atende toda a região'},
+    {id:uid(), nome:'Marquinhos', valorMetro:15, valorMinimo:80, valorDeslocamento:150, obs:'Atende toda a região'},
   ];
   DB.acessorios = [
     {id:uid(), nome:'Deslizante', unidade:'un', valor:1.2},
@@ -418,12 +418,12 @@ function seed(){
     {id:uid(), nome:'Ilhós', unidade:'un', valor:2.5},
   ];
   DB.modelos = [
-    {id:uid(), nome:'Cortina Wave', tipo:'cortina', fator:2.2, usaFitaWave:true, usaIlhos:false, espIlhos:0.15, espDeslizante:0.08},
-    {id:uid(), nome:'Cortina de Ilhós', tipo:'cortina', fator:2.0, usaFitaWave:false, usaIlhos:true, espIlhos:0.15, espDeslizante:0},
-    {id:uid(), nome:'Cortina Prega Americana', tipo:'cortina', fator:2.5, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0},
-    {id:uid(), nome:'Cortina Macho', tipo:'cortina', fator:2.0, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0},
-    {id:uid(), nome:'Persiana Rolô', tipo:'persiana', fator:1, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0},
-    {id:uid(), nome:'Persiana Horizontal', tipo:'persiana', fator:1, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0},
+    {id:uid(), nome:'Cortina Wave', tipo:'cortina', fator:3, usaBainha:true, fatorReporte:2, usaFitaWave:true, usaIlhos:false, espIlhos:0.15, espDeslizante:0.08},
+    {id:uid(), nome:'Cortina de Ilhós', tipo:'cortina', fator:3, usaBainha:true, fatorReporte:2, usaFitaWave:false, usaIlhos:true, espIlhos:0.15, espDeslizante:0},
+    {id:uid(), nome:'Cortina Prega Americana', tipo:'cortina', fator:3, usaBainha:true, fatorReporte:2, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0},
+    {id:uid(), nome:'Cortina Macho', tipo:'cortina', fator:3, usaBainha:true, fatorReporte:2, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0},
+    {id:uid(), nome:'Persiana Rolô', tipo:'persiana', fator:1, usaBainha:false, fatorReporte:0, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0},
+    {id:uid(), nome:'Persiana Horizontal', tipo:'persiana', fator:1, usaBainha:false, fatorReporte:0, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0},
   ];
   DB.orcamentos = [];
 }
@@ -548,15 +548,17 @@ function renderInstaladores(){
   const el = document.getElementById('cad-instaladores');
   let rows = DB.instaladores.map(i=>`
     <tr><td>${i.nome}</td><td class="num">${money(i.valorMetro)}/m</td>
-    <td class="num">${money(i.valorMinimo)}</td><td>${i.obs||'-'}</td>
+    <td class="num">${money(i.valorMinimo)}</td><td class="num">${money(i.valorDeslocamento||0)}</td><td>${i.obs||'-'}</td>
     <td><button class="del-btn" onclick="delItem('instaladores','${i.id}')">remover</button></td></tr>`).join('');
   el.innerHTML = `
-    <table><thead><tr><th>Nome</th><th>Valor/m</th><th>Valor mínimo</th><th>Observações</th><th></th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="5" class="empty">Nenhum instalador cadastrado</td></tr>'}</tbody></table>
+    <table><thead><tr><th>Nome</th><th>Valor/m</th><th>Valor mínimo</th><th>Deslocamento (embutido)</th><th>Observações</th><th></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="6" class="empty">Nenhum instalador cadastrado</td></tr>'}</tbody></table>
+    <p class="hint">O deslocamento é somado automaticamente ao valor de instalação, mas não aparece como linha separada no orçamento nem na impressão.</p>
     <div class="formgrid">
       <div class="field"><label>Nome</label><input id="ni-nome" placeholder="ex: João"></div>
       <div class="field"><label>Valor por metro (R$)</label><input id="ni-valor" type="number" step="0.01"></div>
       <div class="field"><label>Valor mínimo (R$)</label><input id="ni-min" type="number" step="0.01"></div>
+      <div class="field"><label>Deslocamento embutido (R$)</label><input id="ni-desloc" type="number" step="0.01" value="0"></div>
       <div class="field full"><label>Observações</label><input id="ni-obs" placeholder="opcional"></div>
     </div>
     <button class="btn small" onclick="addInstalador()">+ Adicionar instalador</button>`;
@@ -567,6 +569,7 @@ function addInstalador(){
   DB.instaladores.push({id:uid(), nome,
     valorMetro:parseFloat(document.getElementById('ni-valor').value)||0,
     valorMinimo:parseFloat(document.getElementById('ni-min').value)||0,
+    valorDeslocamento:parseFloat(document.getElementById('ni-desloc').value)||0,
     obs:document.getElementById('ni-obs').value.trim()});
   saveDB(); renderInstaladores(); populateSelects();
 }
@@ -600,18 +603,21 @@ function renderModelos(){
   let rows = DB.modelos.map(m=>`
     <tr><td>${m.nome}<span class="flag">${m.tipo}</span></td>
     <td class="num">${m.tipo==='cortina' ? 'x'+m.fator : '—'}</td>
+    <td>${m.tipo==='cortina' ? (m.usaBainha? '÷'+(m.fatorReporte||2) : 'Não') : '—'}</td>
     <td>${m.usaFitaWave?'Sim':'Não'}</td><td>${m.usaIlhos?'Sim':'Não'}</td>
     <td><button class="del-btn" onclick="delItem('modelos','${m.id}')">remover</button></td></tr>`).join('');
   el.innerHTML = `
-    <table><thead><tr><th>Modelo</th><th>Fator de franzido</th><th>Usa fita Wave</th><th>Usa ilhós</th><th></th></tr></thead>
+    <table><thead><tr><th>Modelo</th><th>Fator de franzido</th><th>Reporte (bainha)</th><th>Usa fita Wave</th><th>Usa ilhós</th><th></th></tr></thead>
     <tbody>${rows}</tbody></table>
-    <p class="hint">Persianas não usam fator de franzido — o cálculo é por área (m²).</p>
+    <p class="hint">Regra padrão da loja: franzido = largura × 3 (arred. p/ cima); reporte de bainha = franzido ÷ 2, somado só no tecido principal (o forro usa apenas o franzido, sem reporte). Persianas não usam nada disso — o cálculo é por área (m²).</p>
     <div class="formgrid">
       <div class="field"><label>Nome</label><input id="nm-nome" placeholder="ex: Cortina Painel"></div>
       <div class="field"><label>Tipo</label>
         <select id="nm-tipo"><option value="cortina">Cortina (franzido)</option><option value="persiana">Persiana (área)</option></select>
       </div>
-      <div class="field"><label>Fator de franzido</label><input id="nm-fator" type="number" step="0.1" value="2.0"></div>
+      <div class="field"><label>Fator de franzido (× largura)</label><input id="nm-fator" type="number" step="0.1" value="3"></div>
+      <div class="field"><label>Tem bainha colocada (reporte)?</label><select id="nm-bainha"><option value="true">Sim</option><option value="false">Não</option></select></div>
+      <div class="field"><label>Fator de reporte (÷ franzido)</label><input id="nm-reporte" type="number" step="0.1" value="2"></div>
       <div class="field"><label>Usa fita Wave?</label><select id="nm-wave"><option value="false">Não</option><option value="true">Sim</option></select></div>
       <div class="field"><label>Usa ilhós?</label><select id="nm-ilhos"><option value="false">Não</option><option value="true">Sim</option></select></div>
     </div>
@@ -621,7 +627,9 @@ function addModelo(){
   const nome=document.getElementById('nm-nome').value.trim();
   if(!nome){ alert('Informe o nome.'); return; }
   DB.modelos.push({id:uid(), nome, tipo:document.getElementById('nm-tipo').value,
-    fator:parseFloat(document.getElementById('nm-fator').value)||2.0,
+    fator:parseFloat(document.getElementById('nm-fator').value)||3,
+    usaBainha:document.getElementById('nm-bainha').value==='true',
+    fatorReporte:parseFloat(document.getElementById('nm-reporte').value)||2,
     usaFitaWave:document.getElementById('nm-wave').value==='true',
     usaIlhos:document.getElementById('nm-ilhos').value==='true',
     espIlhos:0.15, espDeslizante:0.08});
@@ -670,7 +678,7 @@ document.getElementById('f-modelo').addEventListener('change', toggleModeloField
 function toggleModeloFields(){
   const modelo = DB.modelos.find(m=>m.id===document.getElementById('f-modelo').value);
   const isCortina = modelo && modelo.tipo==='cortina';
-  ['wrap-forro','wrap-trilho','wrap-folhas','wrap-abertura'].forEach(id=>{
+  ['wrap-forro','wrap-trilho','wrap-folhas','wrap-abertura','wrap-costureira'].forEach(id=>{
     document.getElementById(id).style.display = isCortina ? 'flex' : 'none';
   });
 }
@@ -680,6 +688,11 @@ function toggleModeloFields(){
 --------------------------------------------------------------- */
 function round2(n){ return Math.round(n*100)/100; }
 function roundUp(n){ return Math.ceil(n); }
+function listaPt(arr){
+  if(!arr.length) return '';
+  if(arr.length===1) return arr[0];
+  return arr.slice(0,-1).join(', ') + ' e ' + arr[arr.length-1];
+}
 
 let draftComodos = [];
 
@@ -722,24 +735,24 @@ function calcularComodo(){
       avisos.push(`Altura (${altura}m) acima do limite de ${costureira.nome} (${costureira.alturaMax}m). Considere outra costureira ou emenda.`);
     }
 
-    let metrosLineares = round2(largura * modelo.fator);
-    let fatorEmenda = altura > 2.8 ? 2 : 1;
-    if(fatorEmenda===2) avisos.push('Altura acima de 2,80m — o sistema dobrou o consumo de tecido/forro para emenda. Confirme com a costureira.');
-    let consumoTecido = round2(metrosLineares * fatorEmenda);
+    let metrosFranzido = roundUp(largura * modelo.fator);
+    let reporte = modelo.usaBainha ? round2(metrosFranzido / (modelo.fatorReporte||2)) : 0;
+    let consumoTecido = round2(metrosFranzido + reporte);
+    let consumoForro = metrosFranzido; // forro não leva bainha/reporte
 
     // Tecido
     let valorTecidoBruto = round2(consumoTecido * tecido.valor);
     let valorTecido = round2(valorTecidoBruto * (1 - descontoPct));
     if(descontoPct) descontoTotal += round2(valorTecidoBruto - valorTecido);
-    materiais.push({nome:`Tecido — ${tecido.nome}${descontoPct? ' (10% à vista)':''}`, qtd:`${consumoTecido} m`, valor:valorTecido});
+    materiais.push({nome:`Tecido — ${tecido.nome}${descontoPct? ' (10% à vista)':''}`, qtd:`${consumoTecido} m (${metrosFranzido}m franzido + ${reporte}m bainha)`, valor:valorTecido});
     materialTotal += valorTecido;
 
     // Forro
     if(forro){
-      let valorForroBruto = round2(consumoTecido * forro.valor);
+      let valorForroBruto = round2(consumoForro * forro.valor);
       let valorForro = round2(valorForroBruto * (1 - descontoPct));
       if(descontoPct) descontoTotal += round2(valorForroBruto - valorForro);
-      materiais.push({nome:`Forro — ${forro.nome}${descontoPct? ' (10% à vista)':''}`, qtd:`${consumoTecido} m`, valor:valorForro});
+      materiais.push({nome:`Forro — ${forro.nome}${descontoPct? ' (10% à vista)':''}`, qtd:`${consumoForro} m`, valor:valorForro});
       materialTotal += valorForro;
     }
 
@@ -754,7 +767,7 @@ function calcularComodo(){
     // Fita Wave
     if(modelo.usaFitaWave){
       const fita = DB.acessorios.find(a=>a.nome.toLowerCase().includes('wave'));
-      let metrosFita = roundUp(metrosLineares);
+      let metrosFita = roundUp(metrosFranzido);
       if(fita){
         let v = round2(metrosFita * fita.valor);
         materiais.push({nome:'Fita Wave', qtd:`${metrosFita} m`, valor:v});
@@ -765,7 +778,7 @@ function calcularComodo(){
     // Ilhós
     if(modelo.usaIlhos){
       const ilhos = DB.acessorios.find(a=>a.nome.toLowerCase()==='ilhós' || a.nome.toLowerCase()==='ilhos');
-      let qtdIlhos = roundUp(metrosLineares / (modelo.espIlhos||0.15)) + 1;
+      let qtdIlhos = roundUp(metrosFranzido / (modelo.espIlhos||0.15)) + 1;
       if(ilhos){
         let v = round2(qtdIlhos * ilhos.valor);
         materiais.push({nome:'Ilhós', qtd:`${qtdIlhos} un`, valor:v});
@@ -776,7 +789,7 @@ function calcularComodo(){
     // Deslizantes (para wave/varão)
     if(modelo.espDeslizante>0){
       const desl = DB.acessorios.find(a=>a.nome.toLowerCase()==='deslizante');
-      let qtdDesl = roundUp(metrosLineares / modelo.espDeslizante);
+      let qtdDesl = roundUp(metrosFranzido / modelo.espDeslizante);
       if(desl){
         let v = round2(qtdDesl * desl.valor);
         materiais.push({nome:'Deslizantes', qtd:`${qtdDesl} un`, valor:v});
@@ -820,10 +833,17 @@ function calcularComodo(){
     maoObraTotal = round2(mo);
 
     // Instalação
-    instalacaoTotal = Math.max(round2(largura * instalador.valorMetro), instalador.valorMinimo);
+    instalacaoTotal = Math.max(round2(largura * instalador.valorMetro), instalador.valorMinimo) + (instalador.valorDeslocamento||0);
 
     descTecnica = `${modelo.nome} — largura ${largura}m x altura ${altura}m, ${folhas} folha(s), abertura ${abertura.toLowerCase()}. Tecido: ${tecido.nome} (${consumoTecido}m). ${forro? 'Forro: '+forro.nome+'. ':''}Trilho: ${trilho.nome}. Confecção: ${costureira.nome}. Instalação: ${instalador.nome}.`;
-    descComercial = `Cortina modelo ${modelo.nome} confeccionada em tecido ${tecido.nome}${forro? ', com forro em '+forro.nome.toLowerCase() : ''}, instalada em ${trilho.nome.toLowerCase()}, incluindo todos os acessórios, confecção e instalação.`;
+
+    const acessoriosNomes = materiais
+      .map(m=>m.nome)
+      .filter(n => !n.startsWith('Tecido') && !n.startsWith('Forro') && !n.startsWith('Trilho'))
+      .map(n => n.toLowerCase());
+    const acessoriosTexto = acessoriosNomes.length ? listaPt(acessoriosNomes) : 'acessórios de instalação';
+
+    descComercial = `Cortina modelo ${modelo.nome} confeccionada em tecido ${tecido.nome}${forro? ', com forro em '+forro.nome.toLowerCase() : ''}, instalada em ${trilho.nome.toLowerCase()}, incluindo ${acessoriosTexto}, confecção e instalação.`;
 
   } else {
     // PERSIANA — cálculo por área
@@ -838,10 +858,10 @@ function calcularComodo(){
     materiais.push({nome:`${tecido.nome}${descontoPct? ' (10% à vista)':''}`, qtd:`${area} m²`, valor:valorMaterial});
     materialTotal += valorMaterial;
 
-    instalacaoTotal = Math.max(round2(largura * instalador.valorMetro), instalador.valorMinimo);
+    instalacaoTotal = Math.max(round2(largura * instalador.valorMetro), instalador.valorMinimo) + (instalador.valorDeslocamento||0);
 
     descTecnica = `${modelo.nome} — largura ${largura}m x altura ${altura}m (${area} m²). Material: ${tecido.nome}. Instalação: ${instalador.nome}.`;
-    descComercial = `${modelo.nome} confeccionada em ${tecido.nome.toLowerCase()}, sob medida, incluindo instalação completa.`;
+    descComercial = `${modelo.nome} confeccionada em ${tecido.nome.toLowerCase()}, sob medida, incluindo material, acessórios de fixação e instalação completa.`;
   }
 
   const total = round2(materialTotal + maoObraTotal + instalacaoTotal);
