@@ -123,6 +123,11 @@
     font-size:11px; padding:2px 9px; cursor:pointer; font-family:inherit;
   }
   .del-btn:hover{background:var(--bad); color:#fff;}
+  .edit-btn{
+    background:none; border:1px solid var(--teal); color:var(--teal); border-radius:12px;
+    font-size:11px; padding:2px 9px; cursor:pointer; font-family:inherit; margin-right:6px;
+  }
+  .edit-btn:hover{background:var(--teal); color:#fff;}
 
   .formgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:14px;}
   .field{display:flex; flex-direction:column; gap:4px;}
@@ -220,6 +225,7 @@
   <div class="eyebrow sans">Loja Ambiente · Ateliê Digital</div>
   <h1>Orçamento <span class="stitch">Inteligente</span> de Cortinas &amp; Persianas</h1>
   <p>Informe medidas e características — o sistema calcula materiais, mão de obra, instalação e o preço final.</p>
+  <p id="storage-status" class="sub" style="margin-top:6px; font-size:10.5px; opacity:.7;"></p>
   <div class="seam"></div>
 </header>
 
@@ -238,7 +244,15 @@
       <p class="sub">Preencha o essencial. Os cálculos de consumo, mão de obra e instalação são feitos automaticamente a partir dos cadastros.</p>
 
       <div class="formgrid" style="border-bottom:1px solid var(--line); padding-bottom:16px; margin-bottom:6px;">
-        <div class="field full"><label>Cliente</label><input id="f-cliente" placeholder="Nome do cliente"></div>
+        <div class="field"><label>Cliente</label><input id="f-cliente" placeholder="Nome do cliente"></div>
+        <div class="field">
+          <label>Engenheiro(a)/Arquiteto(a) responsável</label>
+          <input id="f-arquiteto" placeholder="Nome do arquiteto(a)">
+          <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-size:12px; margin-top:6px; cursor:pointer;">
+            <input type="checkbox" id="f-arquiteto-na" style="width:auto;" onchange="document.getElementById('f-arquiteto').disabled=this.checked; if(this.checked) document.getElementById('f-arquiteto').value='';">
+            Não se aplica
+          </label>
+        </div>
       </div>
       <p class="hint">Preencha o cliente uma vez — depois adicione quantos cômodos precisar abaixo. O orçamento final mostra automaticamente as duas opções de pagamento (à vista e a prazo) para o cliente escolher.</p>
 
@@ -286,14 +300,19 @@
           <label>Costureira</label>
           <select id="f-costureira"></select>
         </div>
-        <div class="field">
+        <div class="field" id="wrap-instalador">
           <label>Instalador</label>
           <select id="f-instalador"></select>
         </div>
       </div>
 
-      <div class="formgrid">
-        <div class="field full">
+      <div class="formgrid" id="wrap-acessorios-trilho">
+        <div class="field"><label>Suportes (un)</label><input id="f-suportes" type="number" min="0" value="0"></div>
+        <div class="field"><label>Terminais (un)</label><input id="f-terminais" type="number" min="0" value="2"></div>
+        <div class="field"><label>Ponteiras (un)</label><input id="f-ponteiras" type="number" min="0" value="2"></div>
+      </div>
+
+      <div class="formgrid">        <div class="field full">
           <label>Observações</label>
           <textarea id="f-obs" placeholder="Detalhes adicionais para o orçamento..."></textarea>
         </div>
@@ -307,6 +326,11 @@
         <div style="display:flex; justify-content:space-between; align-items:center; font-family:'Avenir Next','Segoe UI',system-ui,sans-serif;">
           <div style="font-size:13px; color:var(--ink-soft);">Total geral (todos os cômodos)</div>
           <div style="font-size:20px; font-weight:700; color:var(--teal);" id="draft-total">R$ 0,00</div>
+        </div>
+        <div class="field full" style="margin-top:18px; margin-bottom:0;">
+          <label>Imagem ilustrativa do orçamento (opcional)</label>
+          <input type="file" id="f-imagem" accept="image/*">
+          <div id="imagem-preview" style="margin-top:8px;"></div>
         </div>
         <button class="btn" id="btn-finalizar" style="margin-top:16px;">Finalizar orçamento</button>
       </div>
@@ -364,32 +388,48 @@ function uid(){ return Math.random().toString(36).slice(2,9); }
 function fmt(n){ return (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}); }
 function money(n){ return 'R$ ' + fmt(n); }
 
+const TEM_STORAGE_CLAUDE = (typeof window.storage !== 'undefined' && window.storage !== null);
+
 async function saveDB(){
-  try{ await window.storage.set('cortinas-db', JSON.stringify(DB)); }
-  catch(e){ console.error('Erro ao salvar', e); }
+  const json = JSON.stringify(DB);
+  try{
+    if(TEM_STORAGE_CLAUDE){
+      await window.storage.set('cortinas-db', json);
+    } else {
+      localStorage.setItem('cortinas-db', json);
+    }
+  }catch(e){
+    console.error('Erro ao salvar', e);
+    try{ localStorage.setItem('cortinas-db', json); }catch(e2){ console.error('Erro ao salvar (fallback)', e2); }
+  }
 }
 
 async function loadDB(){
   try{
-    const r = await window.storage.get('cortinas-db');
-    if(r && r.value){ DB = JSON.parse(r.value); return true; }
+    if(TEM_STORAGE_CLAUDE){
+      const r = await window.storage.get('cortinas-db');
+      if(r && r.value){ DB = JSON.parse(r.value); return true; }
+    } else {
+      const v = localStorage.getItem('cortinas-db');
+      if(v){ DB = JSON.parse(v); return true; }
+    }
   }catch(e){ /* não existe ainda */ }
   return false;
 }
 
 function seed(){
   DB.tecidos = [
-    {id:uid(), nome:'Linho Off White', spec:'Linho', tipo:'Principal', valor:45},
-    {id:uid(), nome:'Voil Cristal', spec:'Voil', tipo:'Principal', valor:38},
-    {id:uid(), nome:'Blackout Liso Grafite', spec:'Blackout', tipo:'Blackout', valor:52},
-    {id:uid(), nome:'Forro Microfibra', spec:'Forro Microfibra', tipo:'Forro', valor:28},
-    {id:uid(), nome:'Tela Solar 5%', spec:'Tela Solar', tipo:'Persiana', valor:69},
-    {id:uid(), nome:'Persiana Horizontal Alumínio', spec:'Alumínio 25mm', tipo:'Persiana', valor:89},
+    {id:uid(), codigo:'LN-001', nome:'Linho Off White', spec:'Linho', tipo:'Principal', largura:3.00, valor:45},
+    {id:uid(), codigo:'VC-002', nome:'Voil Cristal', spec:'Voil', tipo:'Principal', largura:2.80, valor:38},
+    {id:uid(), codigo:'BL-003', nome:'Blackout Liso Grafite', spec:'Blackout', tipo:'Blackout', largura:2.80, valor:52},
+    {id:uid(), codigo:'FM-004', nome:'Forro Microfibra', spec:'Forro Microfibra', tipo:'Forro', largura:2.80, valor:28},
+    {id:uid(), codigo:'TS-005', nome:'Tela Solar 5%', spec:'Tela Solar', tipo:'Persiana', largura:2.50, valor:69},
+    {id:uid(), codigo:'PH-006', nome:'Persiana Horizontal Alumínio', spec:'Alumínio 25mm', tipo:'Persiana', largura:0, valor:89},
   ];
   DB.trilhos = [
-    {id:uid(), nome:'Trilho Suíço Simples', valorMetro:28, espSuportes:0.6, qtdTerminais:2, qtdPonteiras:2},
-    {id:uid(), nome:'Trilho Suíço Duplo', valorMetro:38, espSuportes:0.6, qtdTerminais:2, qtdPonteiras:2},
-    {id:uid(), nome:'Varão', valorMetro:25, espSuportes:0.8, qtdTerminais:2, qtdPonteiras:0},
+    {id:uid(), nome:'Trilho Suíço Simples', valorMetro:28},
+    {id:uid(), nome:'Trilho Suíço Duplo', valorMetro:38},
+    {id:uid(), nome:'Varão', valorMetro:25},
   ];
   DB.costureiras = [
     {id:uid(), nome:'Zenita', valorSemForro:48, acrescimoForro:26, modelos:['Cortina Wave','Cortina de Ilhós','Cortina Prega Americana'], alturaMax:4.0},
@@ -450,19 +490,22 @@ function renderTecidos(){
   const el = document.getElementById('cad-tecidos');
   let rows = DB.tecidos.map(t=>`
     <tr>
-      <td>${t.nome}</td><td>${t.spec}</td><td>${t.tipo}</td>
+      <td>${t.codigo||'-'}</td><td>${t.nome}</td><td>${t.spec}</td><td>${t.tipo}</td>
+      <td class="num">${t.largura? t.largura+' m' : '-'}</td>
       <td class="num">${money(t.valor)}/m</td>
-      <td><button class="del-btn" onclick="delItem('tecidos','${t.id}')">remover</button></td>
+      <td><button class="edit-btn" onclick="editarValor('tecidos','${t.id}','valor','Valor por metro')">R$</button><button class="edit-btn" onclick="editarValor('tecidos','${t.id}','largura','Largura do rolo (m)')">larg.</button><button class="del-btn" onclick="delItem('tecidos','${t.id}')">remover</button></td>
     </tr>`).join('');
   el.innerHTML = `
-    <table><thead><tr><th>Nome</th><th>Especificação</th><th>Tipo</th><th>Valor/m</th><th></th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="5" class="empty">Nenhum tecido cadastrado</td></tr>'}</tbody></table>
+    <table><thead><tr><th>Código</th><th>Nome</th><th>Especificação</th><th>Tipo</th><th>Largura rolo</th><th>Valor/m</th><th></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="7" class="empty">Nenhum tecido cadastrado</td></tr>'}</tbody></table>
     <div class="formgrid">
+      <div class="field"><label>Código do material</label><input id="nt-codigo" placeholder="ex: LN-045"></div>
       <div class="field"><label>Nome</label><input id="nt-nome" placeholder="ex: Linho Cru"></div>
       <div class="field"><label>Especificação</label><input id="nt-spec" placeholder="ex: Linho, Voil, Blackout..."></div>
       <div class="field"><label>Tipo</label>
         <select id="nt-tipo"><option>Principal</option><option>Forro</option><option>Blackout</option><option>Persiana</option><option>Outro</option></select>
       </div>
+      <div class="field"><label>Largura do rolo (m)</label><input id="nt-largura" type="number" step="0.01" min="0" placeholder="ex: 2.80"></div>
       <div class="field"><label>Valor por metro (R$)</label><input id="nt-valor" type="number" step="0.01" min="0"></div>
     </div>
     <button class="btn small" onclick="addTecido()">+ Adicionar tecido</button>`;
@@ -471,7 +514,9 @@ function addTecido(){
   const nome=document.getElementById('nt-nome').value.trim();
   const valor=parseFloat(document.getElementById('nt-valor').value);
   if(!nome||!valor){ alert('Informe nome e valor.'); return; }
-  DB.tecidos.push({id:uid(), nome, spec:document.getElementById('nt-spec').value.trim()||'-', tipo:document.getElementById('nt-tipo').value, valor});
+  DB.tecidos.push({id:uid(), codigo:document.getElementById('nt-codigo').value.trim()||'-', nome,
+    spec:document.getElementById('nt-spec').value.trim()||'-', tipo:document.getElementById('nt-tipo').value,
+    largura:parseFloat(document.getElementById('nt-largura').value)||0, valor});
   saveDB(); renderTecidos(); populateSelects();
 }
 
@@ -479,19 +524,14 @@ function renderTrilhos(){
   const el = document.getElementById('cad-trilhos');
   let rows = DB.trilhos.map(t=>`
     <tr><td>${t.nome}</td><td class="num">${money(t.valorMetro)}/m</td>
-    <td class="num">${t.usaSuportes===false? 'Não usa' : t.espSuportes+' m'}</td><td class="num">${t.qtdTerminais}</td><td class="num">${t.qtdPonteiras}</td>
-    <td><button class="del-btn" onclick="delItem('trilhos','${t.id}')">remover</button></td></tr>`).join('');
+    <td><button class="edit-btn" onclick="editarValor('trilhos','${t.id}','valorMetro','Valor por metro')">editar</button><button class="del-btn" onclick="delItem('trilhos','${t.id}')">remover</button></td></tr>`).join('');
   el.innerHTML = `
-    <table><thead><tr><th>Nome</th><th>Valor/m</th><th>Espaç. suportes</th><th>Terminais</th><th>Ponteiras</th><th></th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="6" class="empty">Nenhum trilho cadastrado</td></tr>'}</tbody></table>
-    <p class="hint">O comprimento do trilho e da fita Wave é sempre a largura da janela arredondada para os 10cm acima (ex: 3,66m → 3,70m).</p>
+    <table><thead><tr><th>Nome</th><th>Valor/m</th><th></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="3" class="empty">Nenhum trilho cadastrado</td></tr>'}</tbody></table>
+    <p class="hint">O comprimento do trilho e da fita Wave é sempre a largura da janela arredondada para os 10cm acima (ex: 3,66m → 3,70m). Suportes, terminais e ponteiras agora são informados manualmente em cada cômodo do orçamento (ficam na aba Acessórios).</p>
     <div class="formgrid">
       <div class="field"><label>Nome</label><input id="ntr-nome" placeholder="ex: Trilho Suíço Triplo"></div>
       <div class="field"><label>Valor por metro (R$)</label><input id="ntr-valor" type="number" step="0.01" min="0"></div>
-      <div class="field"><label>Usa suportes cobrados à parte?</label><select id="ntr-usasup"><option value="true">Sim</option><option value="false">Não</option></select></div>
-      <div class="field"><label>Espaçamento entre suportes (m)</label><input id="ntr-esp" type="number" step="0.1" value="0.6"></div>
-      <div class="field"><label>Terminais (un, fixo)</label><input id="ntr-term" type="number" value="2"></div>
-      <div class="field"><label>Ponteiras (un, fixo)</label><input id="ntr-pont" type="number" value="2"></div>
     </div>
     <button class="btn small" onclick="addTrilho()">+ Adicionar trilho</button>`;
 }
@@ -499,11 +539,7 @@ function addTrilho(){
   const nome=document.getElementById('ntr-nome').value.trim();
   const valorMetro=parseFloat(document.getElementById('ntr-valor').value);
   if(!nome||!valorMetro){ alert('Informe nome e valor.'); return; }
-  DB.trilhos.push({id:uid(), nome, valorMetro,
-    usaSuportes:document.getElementById('ntr-usasup').value==='true',
-    espSuportes:parseFloat(document.getElementById('ntr-esp').value)||0.6,
-    qtdTerminais:parseInt(document.getElementById('ntr-term').value)||0,
-    qtdPonteiras:parseInt(document.getElementById('ntr-pont').value)||0});
+  DB.trilhos.push({id:uid(), nome, valorMetro});
   saveDB(); renderTrilhos(); populateSelects();
 }
 
@@ -513,7 +549,7 @@ function renderCostureiras(){
     <tr><td>${c.nome}</td><td class="num">${money(c.valorSemForro)}/m</td>
     <td class="num">+${money(c.acrescimoForro)}/m</td><td>${c.modelos.join(', ')||'-'}</td>
     <td class="num">${c.alturaMax} m</td>
-    <td><button class="del-btn" onclick="delItem('costureiras','${c.id}')">remover</button></td></tr>`).join('');
+    <td><button class="edit-btn" onclick="editarValor('costureiras','${c.id}','valorSemForro','Valor sem forro (R$/m)')">editar</button><button class="del-btn" onclick="delItem('costureiras','${c.id}')">remover</button></td></tr>`).join('');
   const modeloOpts = DB.modelos.filter(m=>m.tipo==='cortina').map(m=>`<option value="${m.nome}">${m.nome}</option>`).join('');
   el.innerHTML = `
     <table><thead><tr><th>Nome</th><th>Sem forro</th><th>Acréscimo c/ forro</th><th>Modelos</th><th>Altura máx.</th><th></th></tr></thead>
@@ -545,7 +581,7 @@ function renderInstaladores(){
   let rows = DB.instaladores.map(i=>`
     <tr><td>${i.nome}</td><td class="num">${money(i.valorMetro)}/m</td>
     <td class="num">${money(i.valorMinimo)}</td><td class="num">${money(i.valorDeslocamento||0)}</td><td>${i.obs||'-'}</td>
-    <td><button class="del-btn" onclick="delItem('instaladores','${i.id}')">remover</button></td></tr>`).join('');
+    <td><button class="edit-btn" onclick="editarValor('instaladores','${i.id}','valorMetro','Valor por metro')">R$/m</button><button class="edit-btn" onclick="editarValor('instaladores','${i.id}','valorMinimo','Valor mínimo')">mín.</button><button class="edit-btn" onclick="editarValor('instaladores','${i.id}','valorDeslocamento','Deslocamento embutido')">desloc.</button><button class="del-btn" onclick="delItem('instaladores','${i.id}')">remover</button></td></tr>`).join('');
   el.innerHTML = `
     <table><thead><tr><th>Nome</th><th>Valor/m</th><th>Valor mínimo</th><th>Deslocamento (embutido)</th><th>Observações</th><th></th></tr></thead>
     <tbody>${rows || '<tr><td colspan="6" class="empty">Nenhum instalador cadastrado</td></tr>'}</tbody></table>
@@ -574,7 +610,7 @@ function renderAcessorios(){
   const el = document.getElementById('cad-acessorios');
   let rows = DB.acessorios.map(a=>`
     <tr><td>${a.nome}</td><td>${a.unidade}</td><td class="num">${money(a.valor)}</td>
-    <td><button class="del-btn" onclick="delItem('acessorios','${a.id}')">remover</button></td></tr>`).join('');
+    <td><button class="edit-btn" onclick="editarValor('acessorios','${a.id}','valor','Valor')">editar</button><button class="del-btn" onclick="delItem('acessorios','${a.id}')">remover</button></td></tr>`).join('');
   el.innerHTML = `
     <table><thead><tr><th>Nome</th><th>Unidade</th><th>Valor</th><th></th></tr></thead>
     <tbody>${rows || '<tr><td colspan="4" class="empty">Nenhum acessório cadastrado</td></tr>'}</tbody></table>
@@ -632,6 +668,20 @@ function addModelo(){
   saveDB(); renderModelos(); populateSelects();
 }
 
+function editarValor(table, id, field, label){
+  const item = DB[table].find(i=>i.id===id);
+  if(!item) return;
+  const atual = item[field];
+  const novo = prompt(`Novo valor para "${label}":`, atual);
+  if(novo === null) return;
+  const num = parseFloat(String(novo).replace(',', '.'));
+  if(isNaN(num)){ alert('Valor inválido — use apenas números.'); return; }
+  item[field] = num;
+  saveDB();
+  renderCadastros();
+  populateSelects();
+}
+
 function delItem(table,id){
   if(!confirm('Remover este item do cadastro?')) return;
   DB[table] = DB[table].filter(i=>i.id!==id);
@@ -653,10 +703,10 @@ function populateSelects(){
   modeloSel.innerHTML = DB.modelos.map(m=>`<option value="${m.id}">${m.nome}</option>`).join('');
 
   const tecidoSel = document.getElementById('f-tecido');
-  tecidoSel.innerHTML = DB.tecidos.map(t=>`<option value="${t.id}">${t.nome} (${money(t.valor)}/m)</option>`).join('');
+  tecidoSel.innerHTML = DB.tecidos.map(t=>`<option value="${t.id}">${t.codigo&&t.codigo!=='-'? '['+t.codigo+'] ':''}${t.nome} (${money(t.valor)}/m)</option>`).join('');
 
   const forroSel = document.getElementById('f-forro');
-  forroSel.innerHTML = '<option value="">Sem forro</option>' + DB.tecidos.filter(t=>t.tipo==='Forro').map(t=>`<option value="${t.id}">${t.nome} (${money(t.valor)}/m)</option>`).join('');
+  forroSel.innerHTML = '<option value="">Sem forro</option>' + DB.tecidos.filter(t=>t.tipo==='Forro').map(t=>`<option value="${t.id}">${t.codigo&&t.codigo!=='-'? '['+t.codigo+'] ':''}${t.nome} (${money(t.valor)}/m)</option>`).join('');
 
   const trilhoSel = document.getElementById('f-trilho');
   trilhoSel.innerHTML = DB.trilhos.map(t=>`<option value="${t.id}">${t.nome} (${money(t.valorMetro)}/m)</option>`).join('');
@@ -674,7 +724,7 @@ document.getElementById('f-modelo').addEventListener('change', toggleModeloField
 function toggleModeloFields(){
   const modelo = DB.modelos.find(m=>m.id===document.getElementById('f-modelo').value);
   const isCortina = modelo && modelo.tipo==='cortina';
-  ['wrap-forro','wrap-trilho','wrap-folhas','wrap-abertura','wrap-costureira'].forEach(id=>{
+  ['wrap-forro','wrap-trilho','wrap-folhas','wrap-abertura','wrap-costureira','wrap-acessorios-trilho'].forEach(id=>{
     document.getElementById(id).style.display = isCortina ? 'flex' : 'none';
   });
 }
@@ -693,6 +743,37 @@ function listaPt(arr){
 }
 
 let draftComodos = [];
+let draftImagem = null;
+
+document.getElementById('f-imagem').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    const img = new Image();
+    img.onload = function(){
+      const maxW = 900;
+      const scale = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      draftImagem = canvas.toDataURL('image/jpeg', 0.75);
+      document.getElementById('imagem-preview').innerHTML =
+        `<img src="${draftImagem}" style="max-width:220px; border:1px solid var(--line); border-radius:4px; display:block;">
+         <button class="del-btn" style="margin-top:6px;" onclick="removerImagemDraft()">remover imagem</button>`;
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+function removerImagemDraft(){
+  draftImagem = null;
+  document.getElementById('f-imagem').value = '';
+  document.getElementById('imagem-preview').innerHTML = '';
+}
 
 function calcularComodo(){
   const ambiente = document.getElementById('f-ambiente').value;
@@ -798,30 +879,27 @@ function calcularComodo(){
     materiais.push({nome:`Trilho — ${trilho.nome}`, qtd:`${metrosTrilho} m`, valor:valorTrilho});
     materialTotal += valorTrilho;
 
-    // Suportes (alguns trilhos, como varão/trilho simples, não usam)
-    if(trilho.usaSuportes !== false){
-      const suporte = DB.acessorios.find(a=>a.nome.toLowerCase()==='suporte');
-      let qtdSuportes = roundUp(largura / (trilho.espSuportes||0.6)) + 1;
-      if(suporte){
-        let v = round2(qtdSuportes * suporte.valor);
-        materiais.push({nome:'Suportes', qtd:`${qtdSuportes} un`, valor:v});
-        materialTotal += v;
-      }
-    }
+    // Suportes, Terminais e Ponteiras — quantidades informadas manualmente pelo vendedor
+    const qtdSuportesInput = parseInt(document.getElementById('f-suportes').value) || 0;
+    const qtdTerminaisInput = parseInt(document.getElementById('f-terminais').value) || 0;
+    const qtdPonteirasInput = parseInt(document.getElementById('f-ponteiras').value) || 0;
 
-    // Terminais e ponteiras (por folha)
+    const suporte = DB.acessorios.find(a=>a.nome.toLowerCase()==='suporte');
+    if(suporte && qtdSuportesInput>0){
+      let v = round2(qtdSuportesInput * suporte.valor);
+      materiais.push({nome:'Suportes', qtd:`${qtdSuportesInput} un`, valor:v});
+      materialTotal += v;
+    }
     const terminal = DB.acessorios.find(a=>a.nome.toLowerCase()==='terminal');
-    let qtdTerminais = trilho.qtdTerminais * (folhas>1?Math.ceil(folhas/2)*2/2:1);
-    qtdTerminais = trilho.qtdTerminais; // fixo por trilho, independente de folhas
-    if(terminal && qtdTerminais>0){
-      let v = round2(qtdTerminais * terminal.valor);
-      materiais.push({nome:'Terminais', qtd:`${qtdTerminais} un`, valor:v});
+    if(terminal && qtdTerminaisInput>0){
+      let v = round2(qtdTerminaisInput * terminal.valor);
+      materiais.push({nome:'Terminais', qtd:`${qtdTerminaisInput} un`, valor:v});
       materialTotal += v;
     }
     const ponteira = DB.acessorios.find(a=>a.nome.toLowerCase()==='ponteira');
-    if(ponteira && trilho.qtdPonteiras>0){
-      let v = round2(trilho.qtdPonteiras * ponteira.valor);
-      materiais.push({nome:'Ponteiras', qtd:`${trilho.qtdPonteiras} un`, valor:v});
+    if(ponteira && qtdPonteirasInput>0){
+      let v = round2(qtdPonteirasInput * ponteira.valor);
+      materiais.push({nome:'Ponteiras', qtd:`${qtdPonteirasInput} un`, valor:v});
       materialTotal += v;
     }
 
@@ -841,7 +919,7 @@ function calcularComodo(){
       .map(n => n.toLowerCase());
     const acessoriosTexto = acessoriosNomes.length ? listaPt(acessoriosNomes) : 'acessórios de instalação';
 
-    descComercial = `Cortina modelo ${modelo.nome} confeccionada em tecido ${tecido.nome}${forro? ', com forro em '+forro.nome.toLowerCase() : ''}, instalada em ${trilho.nome.toLowerCase()}, incluindo ${acessoriosTexto}, confecção e instalação.`;
+    descComercial = `Cortina modelo ${modelo.nome}, medindo ${largura}m de largura × ${altura}m de altura, confeccionada em tecido ${tecido.nome}${forro? ', com forro em '+forro.nome.toLowerCase() : ''}, instalada em ${trilho.nome.toLowerCase()}, incluindo ${acessoriosTexto}, confecção e instalação.`;
 
   } else {
     // PERSIANA — cálculo por área
@@ -858,7 +936,7 @@ function calcularComodo(){
     instalacaoTotal = Math.max(round2(roundUp10cm(largura) * instalador.valorMetro), instalador.valorMinimo) + (instalador.valorDeslocamento||0);
 
     descTecnica = `${modelo.nome} — largura ${largura}m x altura ${altura}m (${area} m²). Material: ${tecido.nome}. Instalação: ${instalador.nome}.`;
-    descComercial = `${modelo.nome} confeccionada em ${tecido.nome.toLowerCase()}, sob medida, incluindo material, acessórios de fixação e instalação completa.`;
+    descComercial = `${modelo.nome}, medindo ${largura}m de largura × ${altura}m de altura, confeccionada em ${tecido.nome.toLowerCase()}, sob medida, incluindo material, acessórios de fixação e instalação completa.`;
   }
 
   const totalPrazo = round2(materialTotal + maoObraTotal + instalacaoTotal);
@@ -912,9 +990,13 @@ function finalizarOrcamento(){
   if(!cliente){ alert('Informe o nome do cliente antes de finalizar.'); return; }
   if(!draftComodos.length){ alert('Adicione ao menos um cômodo antes de finalizar.'); return; }
 
+  const arquitetoNA = document.getElementById('f-arquiteto-na').checked;
+  const arquiteto = arquitetoNA ? 'Não se aplica' : (document.getElementById('f-arquiteto').value.trim() || 'Não se aplica');
+
   const orcamento = {
-    id: uid(), data: new Date().toISOString(), cliente,
+    id: uid(), data: new Date().toISOString(), cliente, arquiteto,
     comodos: draftComodos.slice(),
+    imagem: draftImagem,
     materialTotalGeral: round2(draftComodos.reduce((s,c)=>s+c.materialTotal,0)),
     maoObraTotalGeral: round2(draftComodos.reduce((s,c)=>s+c.maoObraTotal,0)),
     instalacaoTotalGeral: round2(draftComodos.reduce((s,c)=>s+c.instalacaoTotal,0)),
@@ -930,6 +1012,10 @@ function finalizarOrcamento(){
   draftComodos = [];
   renderDraft();
   document.getElementById('f-cliente').value = '';
+  document.getElementById('f-arquiteto').value = '';
+  document.getElementById('f-arquiteto-na').checked = false;
+  document.getElementById('f-arquiteto').disabled = false;
+  removerImagemDraft();
 }
 
 function renderResultadoFinal(o){
@@ -937,7 +1023,7 @@ function renderResultadoFinal(o){
   el.style.display = 'block';
   el.innerHTML = `
     <h2 style="border:none; padding-bottom:0;"><span class="n">✓</span>Orçamento finalizado — ${o.cliente}</h2>
-    <p class="sub">${o.comodos.length} cômodo(s)</p>
+    <p class="sub">${o.comodos.length} cômodo(s)${o.arquiteto? ' · Arquiteto(a) responsável: '+o.arquiteto : ''}</p>
     <div class="resultgrid">
       <div>
         ${o.comodos.map(c=>`
@@ -948,7 +1034,10 @@ function renderResultadoFinal(o){
               ${c.materiais.map(m=>`<li><span>${m.nome}</span><span class="qty">${m.qtd} — ${money(m.valor)}</span></li>`).join('')}
             </ul>
             <div class="desc-box"><span class="lbl">Descrição comercial</span>${c.descComercial}</div>
-            <div style="text-align:right; font-family:'Avenir Next','Segoe UI',system-ui,sans-serif; font-weight:700; margin-top:8px;">Subtotal a prazo: ${money(c.totalPrazo)}</div>
+            <div style="text-align:right; font-family:'Avenir Next','Segoe UI',system-ui,sans-serif; margin-top:8px;">
+              <div style="font-weight:700;">Subtotal a prazo: ${money(c.totalPrazo)}</div>
+              <div style="color:var(--teal); font-size:12.5px;">Subtotal à vista: ${money(c.totalAvista)}</div>
+            </div>
           </div>`).join('')}
       </div>
       <div>
@@ -962,7 +1051,11 @@ function renderResultadoFinal(o){
         </div>
         <button class="btn ghost" style="margin-top:14px; width:100%;" onclick="imprimirOrcamento('${o.id}')">Imprimir orçamento</button>
       </div>
-    </div>`;
+    </div>
+    ${o.imagem? `<div style="margin-top:24px; text-align:center; border-top:1px solid var(--line); padding-top:20px;">
+      <div class="sub" style="margin-bottom:10px;">Imagem ilustrativa</div>
+      <img src="${o.imagem}" style="max-width:100%; max-height:400px; border-radius:4px; border:1px solid var(--line);">
+    </div>` : ''}`;
 }
 
 document.getElementById('btn-add-comodo').addEventListener('click', addComodo);
@@ -971,6 +1064,8 @@ document.getElementById('btn-finalizar').addEventListener('click', finalizarOrca
 /* ---------------------------------------------------------------
    IMPRESSÃO
 --------------------------------------------------------------- */
+const LOGO_BASE64 = 'data:image/png;base64,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';
+
 const TEXTO_PAGAMENTO = [
   'Valor a prazo: parcelamento em até 10x no cartão.',
   'Valor à vista: 50% acertado no fechamento do pedido e o restante após a instalação.',
@@ -1004,51 +1099,72 @@ function normalizeOrcamento(o){
   };
 }
 
+const MESES_PT = ['jan.','fev.','mar.','abr.','mai.','jun.','jul.','ago.','set.','out.','nov.','dez.'];
+function dataExtensoPt(d){
+  return `${d.getDate()} de ${MESES_PT[d.getMonth()]} de ${d.getFullYear()}`;
+}
+
 function buildPrintHTML(o){
-  const dataFmt = new Date(o.data).toLocaleDateString('pt-BR');
-  const comodosHtml = o.comodos.map((c,i)=>`
-    <div style="margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid #ccc;">
-      <div style="font-weight:bold; font-size:14px;">${i+1}. ${c.ambiente} — ${c.modeloNome}</div>
-      <div style="font-size:12px; font-style:italic; margin:4px 0;">${c.descComercial||''}</div>
-      <table style="width:100%; border-collapse:collapse; font-size:11.5px; margin-top:6px;">
-        ${c.materiais.map(m=>`<tr><td style="padding:2px 0;">${m.nome}</td><td style="text-align:right; padding:2px 0;">${m.qtd}</td><td style="text-align:right; padding:2px 0;">${money(m.valor)}</td></tr>`).join('')}
-        ${c.maoObraTotal? `<tr><td style="padding:2px 0;">Mão de obra</td><td></td><td style="text-align:right; padding:2px 0;">${money(c.maoObraTotal)}</td></tr>`:''}
-        <tr><td style="padding:2px 0;">Instalação</td><td></td><td style="text-align:right; padding:2px 0;">${money(c.instalacaoTotal)}</td></tr>
-      </table>
-      <div style="text-align:right; font-weight:bold; margin-top:6px; font-size:12.5px;">Subtotal a prazo ${c.ambiente}: ${money(c.totalPrazo)}</div>
-    </div>`).join('');
+  const dataFmt = dataExtensoPt(new Date(o.data));
+  const linhasHtml = o.comodos.map(c=>`
+    <tr><td colspan="4" style="border:1px solid #999; padding:5px 9px; font-weight:bold; background:#f0f0f0; font-size:11.5px;">${c.ambiente}</td></tr>
+    <tr>
+      <td style="border:1px solid #999; text-align:center; padding:7px 5px; vertical-align:top; font-size:11.5px;">1</td>
+      <td style="border:1px solid #999; padding:7px 9px; vertical-align:top; font-size:11.5px;">${c.descComercial||''}</td>
+      <td style="border:1px solid #999; text-align:center; padding:7px 5px; vertical-align:middle; font-size:11.5px; font-weight:bold;">${money(c.totalPrazo)}</td>
+      <td style="border:1px solid #999; text-align:center; padding:7px 5px; vertical-align:middle; font-size:11.5px; font-weight:bold;">${money(c.totalAvista)}</td>
+    </tr>`).join('');
+
+  const arquitetoHtml = (o.arquiteto && o.arquiteto !== 'Não se aplica')
+    ? `<div>Engenheiro(a)/Arquiteto(a): ${o.arquiteto}</div>` : '<div></div>';
 
   return `
-    <div style="text-align:center; margin-bottom:18px; font-family:Georgia,serif;">
-      <div style="font-size:20px; font-weight:bold; letter-spacing:.5px;">LOJA AMBIENTE</div>
-      <div style="font-size:10.5px;">Rua Antônio Bertoncini, 135 - Bairro Cidade Alta - Araranguá/SC - CEP 88901-022</div>
-      <div style="font-size:10.5px;">(48) 3524-1574 / 99931-1574 · lojaambiente@hotmail.com</div>
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+      <img src="${LOGO_BASE64}" style="height:64px;">
+      <div style="font-size:11px; font-family:Georgia,serif; margin-top:6px;">${dataFmt}</div>
     </div>
-    <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:14px; font-family:Georgia,serif;">
-      <div><strong>Cliente:</strong> ${o.cliente}</div>
-      <div><strong>Data:</strong> ${dataFmt}</div>
+    <div style="border-bottom:1px solid #999; margin-bottom:14px;"></div>
+    <div style="display:flex; justify-content:space-between; font-size:13px; font-family:Georgia,serif; margin-bottom:16px;">
+      <div>Cliente: ${o.cliente}</div>
+      ${arquitetoHtml}
     </div>
-    <h3 style="border-bottom:1px solid #000; padding-bottom:4px; font-family:Georgia,serif;">Itens do orçamento</h3>
-    ${comodosHtml}
-    <div style="margin:18px 0; border-top:2px solid #000; padding-top:12px; font-family:Georgia,serif;">
-      <div style="display:flex; justify-content:space-between; font-size:15px; margin-bottom:4px;">
-        <span>Valor a prazo (até 10x no cartão):</span><strong>${money(o.totalGeralPrazo)}</strong>
-      </div>
-      <div style="display:flex; justify-content:space-between; font-size:15px; color:#8C2F1E;">
-        <span>Valor à vista (10% desc. em tecido/forro):</span><strong>${money(o.totalGeralAvista)}</strong>
-      </div>
+    <table style="width:100%; border-collapse:collapse; font-family:Georgia,serif;">
+      <thead>
+        <tr style="background:#8C2F1E; color:#fff;">
+          <th style="border:1px solid #999; padding:6px 5px; font-size:10.5px;">Quant.</th>
+          <th style="border:1px solid #999; padding:6px 5px; font-size:10.5px; text-align:left;">Descrição</th>
+          <th style="border:1px solid #999; padding:6px 5px; font-size:10.5px;">Valor a Prazo</th>
+          <th style="border:1px solid #999; padding:6px 5px; font-size:10.5px;">Valor à Vista</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${linhasHtml}
+        <tr>
+          <td colspan="2" style="border:1px solid #999; padding:7px 9px; font-weight:bold; font-size:12px; text-align:right;">TOTAL GERAL</td>
+          <td style="border:1px solid #999; text-align:center; padding:7px 5px; font-weight:bold; font-size:12px;">${money(o.totalGeralPrazo)}</td>
+          <td style="border:1px solid #999; text-align:center; padding:7px 5px; font-weight:bold; font-size:12px;">${money(o.totalGeralAvista)}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="font-family:Georgia,serif; font-size:10.5px; margin-top:16px; line-height:1.5;">
+      <div><strong>Observação:</strong> ${TEXTO_PAGAMENTO.join(' ')}</div>
+      <div style="margin-top:8px;"><strong>Termos e Condições</strong></div>
+      ${TERMOS.map(t=>`<div>${t}</div>`).join('')}
     </div>
-    <h3 style="border-bottom:1px solid #000; padding-bottom:4px; margin-top:22px; font-family:Georgia,serif;">Condições de pagamento</h3>
-    <div style="font-size:11.5px; font-family:Georgia,serif;">
-      ${TEXTO_PAGAMENTO.map(t=>`<p style="margin:3px 0;">${t}</p>`).join('')}
-    </div>
-    <h3 style="border-bottom:1px solid #000; padding-bottom:4px; margin-top:20px; font-family:Georgia,serif;">Termos e condições</h3>
-    <div style="font-size:10.5px; font-family:Georgia,serif;">
-      ${TERMOS.map(t=>`<p style="margin:5px 0;">${t}</p>`).join('')}
-    </div>
-    <div style="margin-top:44px; display:flex; justify-content:space-between; font-size:11.5px; font-family:Georgia,serif;">
+    ${o.imagem? `<div style="margin-top:18px; page-break-inside:avoid;">
+      <div style="font-family:Georgia,serif; font-size:12px; font-weight:bold; margin-bottom:8px;">Imagem Ilustrativa:</div>
+      <img src="${o.imagem}" style="max-width:60%; max-height:340px;">
+    </div>` : ''}
+    <div style="margin-top:40px; display:flex; justify-content:space-between; font-size:11px; font-family:Georgia,serif;">
       <div>_____________________________<br>Vendedor(a)</div>
       <div>_____________________________<br>Cliente</div>
+    </div>
+    <div style="text-align:center; font-size:9px; font-family:Georgia,serif; color:#333; margin-top:30px; border-top:1px solid #ccc; padding-top:10px;">
+      <div>Razão social: E C DECORAÇÕES EIRELI ME &nbsp;&nbsp; Nome Fantasia: AMBIENTE DECORAÇÕES</div>
+      <div>Rua Antonio Bertoncini, nº 135 - Bairro Cidade Alta - Araranguá - Santa Catarina - CEP: 88.901-022</div>
+      <div>CNPJ: 22.675.872/0001-92 &nbsp;&nbsp; INSC: 25.767.782-8</div>
+      <div>Fone (048) 3524-1574 / (048) 9616-2986</div>
+      <div>lojaambiente@hotmail.com</div>
     </div>`;
 }
 
@@ -1096,6 +1212,12 @@ function renderOrcamentos(){
   }
   renderCadastros();
   populateSelects();
+  const statusEl = document.getElementById('storage-status');
+  if(statusEl){
+    statusEl.textContent = TEM_STORAGE_CLAUDE
+      ? 'Salvamento ativo (dados vinculados a esta conversa/artefato no Claude)'
+      : 'Salvamento local neste navegador — abra sempre pelo mesmo navegador/computador para não perder dados';
+  }
 })();
 </script>
 </body>
