@@ -212,6 +212,7 @@
   }
 
   #print-area{display:none;}
+  #print-area, #print-area *{-webkit-print-color-adjust:exact; print-color-adjust:exact; color-adjust:exact;}
   @media print{
     body *{visibility:hidden;}
     #print-area, #print-area *{visibility:visible;}
@@ -245,6 +246,14 @@
 
       <div class="formgrid" style="border-bottom:1px solid var(--line); padding-bottom:16px; margin-bottom:6px;">
         <div class="field"><label>Cliente</label><input id="f-cliente" placeholder="Nome do cliente"></div>
+        <div class="field">
+          <label>Vendedor(a)</label>
+          <select id="f-vendedor">
+            <option>Josi</option>
+            <option>Amanda</option>
+            <option>Sandra</option>
+          </select>
+        </div>
         <div class="field">
           <label>Engenheiro(a)/Arquiteto(a) responsável</label>
           <input id="f-arquiteto" placeholder="Nome do arquiteto(a)">
@@ -419,12 +428,12 @@ async function loadDB(){
 
 function seed(){
   DB.tecidos = [
-    {id:uid(), codigo:'LN-001', nome:'Linho Off White', spec:'Linho', tipo:'Principal', largura:3.00, valor:45},
-    {id:uid(), codigo:'VC-002', nome:'Voil Cristal', spec:'Voil', tipo:'Principal', largura:2.80, valor:38},
-    {id:uid(), codigo:'BL-003', nome:'Blackout Liso Grafite', spec:'Blackout', tipo:'Blackout', largura:2.80, valor:52},
-    {id:uid(), codigo:'FM-004', nome:'Forro Microfibra', spec:'Forro Microfibra', tipo:'Forro', largura:2.80, valor:28},
-    {id:uid(), codigo:'TS-005', nome:'Tela Solar 5%', spec:'Tela Solar', tipo:'Persiana', largura:2.50, valor:69},
-    {id:uid(), codigo:'PH-006', nome:'Persiana Horizontal Alumínio', spec:'Alumínio 25mm', tipo:'Persiana', largura:0, valor:89},
+    {id:uid(), codigo:'LN-001', nome:'Linho Off White', spec:'Linho', aplicacao:'cortina', tipo:'Principal', largura:3.00, valor:45},
+    {id:uid(), codigo:'VC-002', nome:'Voil Cristal', spec:'Voil', aplicacao:'cortina', tipo:'Principal', largura:2.80, valor:38},
+    {id:uid(), codigo:'BL-003', nome:'Blackout Liso Grafite', spec:'Blackout', aplicacao:'cortina', tipo:'Blackout', largura:2.80, valor:52},
+    {id:uid(), codigo:'FM-004', nome:'Forro Microfibra', spec:'Forro Microfibra', aplicacao:'cortina', tipo:'Forro', largura:2.80, valor:28},
+    {id:uid(), codigo:'TS-005', nome:'Tela Solar 5%', spec:'Tela Solar', aplicacao:'persiana', tipo:'Persiana', largura:2.50, valor:69},
+    {id:uid(), codigo:'PH-006', nome:'Persiana Horizontal Alumínio', spec:'Alumínio 25mm', aplicacao:'persiana', tipo:'Persiana', largura:0, valor:89},
   ];
   DB.trilhos = [
     {id:uid(), nome:'Trilho Suíço Simples', valorMetro:28},
@@ -490,32 +499,47 @@ function renderTecidos(){
   const el = document.getElementById('cad-tecidos');
   let rows = DB.tecidos.map(t=>`
     <tr>
-      <td>${t.codigo||'-'}</td><td>${t.nome}</td><td>${t.spec}</td><td>${t.tipo}</td>
+      <td>${t.codigo||'-'}</td><td>${t.nome}</td><td>${t.spec}</td>
+      <td><span class="flag" style="background:${t.aplicacao==='persiana'?'var(--thread)':'var(--teal)'};">${t.aplicacao==='persiana'?'Persiana':'Cortina'}</span></td>
+      <td>${t.tipo}</td>
       <td class="num">${t.largura? t.largura+' m' : '-'}</td>
       <td class="num">${money(t.valor)}/m</td>
       <td><button class="edit-btn" onclick="editarValor('tecidos','${t.id}','valor','Valor por metro')">R$</button><button class="edit-btn" onclick="editarValor('tecidos','${t.id}','largura','Largura do rolo (m)')">larg.</button><button class="del-btn" onclick="delItem('tecidos','${t.id}')">remover</button></td>
     </tr>`).join('');
   el.innerHTML = `
-    <table><thead><tr><th>Código</th><th>Nome</th><th>Especificação</th><th>Tipo</th><th>Largura rolo</th><th>Valor/m</th><th></th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="7" class="empty">Nenhum tecido cadastrado</td></tr>'}</tbody></table>
+    <table><thead><tr><th>Código</th><th>Nome</th><th>Especificação</th><th>Aplicação</th><th>Tipo</th><th>Largura rolo</th><th>Valor/m</th><th></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="8" class="empty">Nenhum tecido cadastrado</td></tr>'}</tbody></table>
+    <p class="hint">"Aplicação" define se o material aparece no orçamento quando o modelo escolhido for uma cortina ou uma persiana — assim tecido de cortina nunca aparece pra persiana, e vice-versa.</p>
     <div class="formgrid">
       <div class="field"><label>Código do material</label><input id="nt-codigo" placeholder="ex: LN-045"></div>
       <div class="field"><label>Nome</label><input id="nt-nome" placeholder="ex: Linho Cru"></div>
-      <div class="field"><label>Especificação</label><input id="nt-spec" placeholder="ex: Linho, Voil, Blackout..."></div>
-      <div class="field"><label>Tipo</label>
-        <select id="nt-tipo"><option>Principal</option><option>Forro</option><option>Blackout</option><option>Persiana</option><option>Outro</option></select>
+      <div class="field"><label>Especificação</label><input id="nt-spec" placeholder="ex: Linho, Voil, Tela Solar..."></div>
+      <div class="field"><label>Aplicação</label>
+        <select id="nt-aplicacao" onchange="onChangeAplicacaoTecido()">
+          <option value="cortina">Cortina</option>
+          <option value="persiana">Persiana</option>
+        </select>
+      </div>
+      <div class="field" id="wrap-nt-tipo"><label>Tipo</label>
+        <select id="nt-tipo"><option>Principal</option><option>Forro</option><option>Blackout</option><option>Outro</option></select>
       </div>
       <div class="field"><label>Largura do rolo (m)</label><input id="nt-largura" type="number" step="0.01" min="0" placeholder="ex: 2.80"></div>
       <div class="field"><label>Valor por metro (R$)</label><input id="nt-valor" type="number" step="0.01" min="0"></div>
     </div>
     <button class="btn small" onclick="addTecido()">+ Adicionar tecido</button>`;
 }
+function onChangeAplicacaoTecido(){
+  const isPersiana = document.getElementById('nt-aplicacao').value === 'persiana';
+  document.getElementById('wrap-nt-tipo').style.display = isPersiana ? 'none' : 'flex';
+}
 function addTecido(){
   const nome=document.getElementById('nt-nome').value.trim();
   const valor=parseFloat(document.getElementById('nt-valor').value);
   if(!nome||!valor){ alert('Informe nome e valor.'); return; }
+  const aplicacao = document.getElementById('nt-aplicacao').value;
   DB.tecidos.push({id:uid(), codigo:document.getElementById('nt-codigo').value.trim()||'-', nome,
-    spec:document.getElementById('nt-spec').value.trim()||'-', tipo:document.getElementById('nt-tipo').value,
+    spec:document.getElementById('nt-spec').value.trim()||'-', aplicacao,
+    tipo: aplicacao==='persiana' ? 'Persiana' : document.getElementById('nt-tipo').value,
     largura:parseFloat(document.getElementById('nt-largura').value)||0, valor});
   saveDB(); renderTecidos(); populateSelects();
 }
@@ -637,11 +661,14 @@ function renderModelos(){
     <td class="num">${m.tipo==='cortina' ? 'x'+m.fator : '—'}</td>
     <td>${m.tipo==='cortina' ? (m.usaBainha? '÷'+(m.fatorReporte||2) : 'Não') : '—'}</td>
     <td>${m.usaFitaWave?'Sim':'Não'}</td><td>${m.usaIlhos?'Sim':'Não'}</td>
-    <td><button class="del-btn" onclick="delItem('modelos','${m.id}')">remover</button></td></tr>`).join('');
+    <td>
+      ${m.tipo==='cortina' ? `<button class="edit-btn" onclick="editarValor('modelos','${m.id}','fator','Fator de franzido (× largura)')">fator</button><button class="edit-btn" onclick="editarValor('modelos','${m.id}','fatorReporte','Fator de reporte (÷ franzido)')">report.</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','usaBainha')">bainha</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','usaFitaWave')">wave</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','usaIlhos')">ilhós</button>` : ''}
+      <button class="del-btn" onclick="delItem('modelos','${m.id}')">remover</button>
+    </td></tr>`).join('');
   el.innerHTML = `
     <table><thead><tr><th>Modelo</th><th>Fator de franzido</th><th>Reporte (bainha)</th><th>Usa fita Wave</th><th>Usa ilhós</th><th></th></tr></thead>
     <tbody>${rows}</tbody></table>
-    <p class="hint">Regra padrão da loja: franzido = largura × 3 (arred. p/ cima); reporte de bainha = franzido ÷ 2, somado só no tecido principal (o forro usa apenas o franzido, sem reporte). Persianas não usam nada disso — o cálculo é por área (m²).</p>
+    <p class="hint">Regra padrão da loja: franzido = largura × 3 (arred. p/ cima); reporte de bainha = franzido ÷ 2, somado só no tecido principal (o forro usa apenas o franzido, sem reporte). Persianas não usam nada disso — o cálculo é por área (m²). Os botões "bainha", "wave" e "ilhós" alternam entre Sim/Não a cada clique.</p>
     <div class="formgrid">
       <div class="field"><label>Nome</label><input id="nm-nome" placeholder="ex: Cortina Painel"></div>
       <div class="field"><label>Tipo</label>
@@ -682,6 +709,15 @@ function editarValor(table, id, field, label){
   populateSelects();
 }
 
+function toggleBooleano(table, id, field){
+  const item = DB[table].find(i=>i.id===id);
+  if(!item) return;
+  item[field] = !item[field];
+  saveDB();
+  renderCadastros();
+  populateSelects();
+}
+
 function delItem(table,id){
   if(!confirm('Remover este item do cadastro?')) return;
   DB[table] = DB[table].filter(i=>i.id!==id);
@@ -702,12 +738,6 @@ function populateSelects(){
   const modeloSel = document.getElementById('f-modelo');
   modeloSel.innerHTML = DB.modelos.map(m=>`<option value="${m.id}">${m.nome}</option>`).join('');
 
-  const tecidoSel = document.getElementById('f-tecido');
-  tecidoSel.innerHTML = DB.tecidos.map(t=>`<option value="${t.id}">${t.codigo&&t.codigo!=='-'? '['+t.codigo+'] ':''}${t.nome} (${money(t.valor)}/m)</option>`).join('');
-
-  const forroSel = document.getElementById('f-forro');
-  forroSel.innerHTML = '<option value="">Sem forro</option>' + DB.tecidos.filter(t=>t.tipo==='Forro').map(t=>`<option value="${t.id}">${t.codigo&&t.codigo!=='-'? '['+t.codigo+'] ':''}${t.nome} (${money(t.valor)}/m)</option>`).join('');
-
   const trilhoSel = document.getElementById('f-trilho');
   trilhoSel.innerHTML = DB.trilhos.map(t=>`<option value="${t.id}">${t.nome} (${money(t.valorMetro)}/m)</option>`).join('');
 
@@ -727,6 +757,16 @@ function toggleModeloFields(){
   ['wrap-forro','wrap-trilho','wrap-folhas','wrap-abertura','wrap-costureira','wrap-acessorios-trilho'].forEach(id=>{
     document.getElementById(id).style.display = isCortina ? 'flex' : 'none';
   });
+
+  // Filtra os tecidos/materiais disponíveis conforme a aplicação do modelo (cortina x persiana)
+  const aplicacaoAlvo = isCortina ? 'cortina' : 'persiana';
+  const tecidoSel = document.getElementById('f-tecido');
+  const tecidosFiltrados = DB.tecidos.filter(t => (t.aplicacao||'cortina') === aplicacaoAlvo);
+  tecidoSel.innerHTML = tecidosFiltrados.map(t=>`<option value="${t.id}">${t.codigo&&t.codigo!=='-'? '['+t.codigo+'] ':''}${t.nome} (${money(t.valor)}/m)</option>`).join('')
+    || '<option value="">Nenhum material cadastrado para esta aplicação</option>';
+
+  const forroSel = document.getElementById('f-forro');
+  forroSel.innerHTML = '<option value="">Sem forro</option>' + DB.tecidos.filter(t=>t.tipo==='Forro' && (t.aplicacao||'cortina')==='cortina').map(t=>`<option value="${t.id}">${t.codigo&&t.codigo!=='-'? '['+t.codigo+'] ':''}${t.nome} (${money(t.valor)}/m)</option>`).join('');
 }
 
 /* ---------------------------------------------------------------
@@ -913,13 +953,18 @@ function calcularComodo(){
 
     descTecnica = `${modelo.nome} — largura ${largura}m x altura ${altura}m, ${folhas} folha(s), abertura ${abertura.toLowerCase()}. Tecido: ${tecido.nome} (${consumoTecido}m). ${forro? 'Forro: '+forro.nome+'. ':''}Trilho: ${trilho.nome}. Confecção: ${costureira.nome}. Instalação: ${instalador.nome}.`;
 
+    const nomeModeloLimpo = modelo.nome.replace(/^Cortina\s+/i, '');
+    const itensExternosExcluidos = ['entretela', 'fita wave', 'deslizantes'];
     const acessoriosNomes = materiais
       .map(m=>m.nome)
       .filter(n => !n.startsWith('Tecido') && !n.startsWith('Forro') && !n.startsWith('Trilho'))
-      .map(n => n.toLowerCase());
-    const acessoriosTexto = acessoriosNomes.length ? listaPt(acessoriosNomes) : 'acessórios de instalação';
+      .map(n => n.toLowerCase())
+      .filter(n => !itensExternosExcluidos.includes(n));
+    const acessoriosTexto = acessoriosNomes.length ? listaPt(acessoriosNomes) : null;
 
-    descComercial = `Cortina modelo ${modelo.nome}, medindo ${largura}m de largura × ${altura}m de altura, confeccionada em tecido ${tecido.nome}${forro? ', com forro em '+forro.nome.toLowerCase() : ''}, instalada em ${trilho.nome.toLowerCase()}, incluindo ${acessoriosTexto}, confecção e instalação.`;
+    const itensInclusos = [trilho.nome.toLowerCase(), ...acessoriosNomes, 'instalação'];
+
+    descComercial = `Cortina modelo ${nomeModeloLimpo}, medindo ${largura}m de largura × ${altura}m de altura, confeccionada em tecido ${tecido.nome}${forro? ', com forro em '+forro.nome.toLowerCase() : ''}, incluso ${listaPt(itensInclusos)}.`;
 
   } else {
     // PERSIANA — cálculo por área
@@ -992,9 +1037,10 @@ function finalizarOrcamento(){
 
   const arquitetoNA = document.getElementById('f-arquiteto-na').checked;
   const arquiteto = arquitetoNA ? 'Não se aplica' : (document.getElementById('f-arquiteto').value.trim() || 'Não se aplica');
+  const vendedor = document.getElementById('f-vendedor').value;
 
   const orcamento = {
-    id: uid(), data: new Date().toISOString(), cliente, arquiteto,
+    id: uid(), data: new Date().toISOString(), cliente, arquiteto, vendedor,
     comodos: draftComodos.slice(),
     imagem: draftImagem,
     materialTotalGeral: round2(draftComodos.reduce((s,c)=>s+c.materialTotal,0)),
@@ -1023,7 +1069,7 @@ function renderResultadoFinal(o){
   el.style.display = 'block';
   el.innerHTML = `
     <h2 style="border:none; padding-bottom:0;"><span class="n">✓</span>Orçamento finalizado — ${o.cliente}</h2>
-    <p class="sub">${o.comodos.length} cômodo(s)${o.arquiteto? ' · Arquiteto(a) responsável: '+o.arquiteto : ''}</p>
+    <p class="sub">${o.comodos.length} cômodo(s)${o.vendedor? ' · Vendedor(a): '+o.vendedor : ''}${o.arquiteto && o.arquiteto!=='Não se aplica'? ' · Engenheiro(a)/Arquiteto(a): '+o.arquiteto : ''}</p>
     <div class="resultgrid">
       <div>
         ${o.comodos.map(c=>`
@@ -1049,7 +1095,8 @@ function renderResultadoFinal(o){
           <div class="row" style="margin-top:8px;"><span>Desconto à vista (tecido/forro)</span><span>− ${money(o.descontoTotalGeral)}</span></div>
           <div class="grand"><span>À <span class="stitch">Vista</span></span><span>${money(o.totalGeralAvista)}</span></div>
         </div>
-        <button class="btn ghost" style="margin-top:14px; width:100%;" onclick="imprimirOrcamento('${o.id}')">Imprimir orçamento</button>
+        <button class="btn ghost" style="margin-top:14px; width:100%;" onclick="imprimirOrcamentoCliente('${o.id}')">Imprimir para Cliente</button>
+        <button class="btn ghost" style="margin-top:8px; width:100%;" onclick="imprimirOrcamentoProducao('${o.id}')">Imprimir para Produção</button>
       </div>
     </div>
     ${o.imagem? `<div style="margin-top:24px; text-align:center; border-top:1px solid var(--line); padding-top:20px;">
@@ -1106,74 +1153,150 @@ function dataExtensoPt(d){
 
 function buildPrintHTML(o){
   const dataFmt = dataExtensoPt(new Date(o.data));
-  const linhasHtml = o.comodos.map(c=>`
-    <tr><td colspan="4" style="border:1px solid #999; padding:5px 9px; font-weight:bold; background:#f0f0f0; font-size:11.5px;">${c.ambiente}</td></tr>
-    <tr>
-      <td style="border:1px solid #999; text-align:center; padding:7px 5px; vertical-align:top; font-size:11.5px;">1</td>
-      <td style="border:1px solid #999; padding:7px 9px; vertical-align:top; font-size:11.5px;">${c.descComercial||''}</td>
-      <td style="border:1px solid #999; text-align:center; padding:7px 5px; vertical-align:middle; font-size:11.5px; font-weight:bold;">${money(c.totalPrazo)}</td>
-      <td style="border:1px solid #999; text-align:center; padding:7px 5px; vertical-align:middle; font-size:11.5px; font-weight:bold;">${money(c.totalAvista)}</td>
-    </tr>`).join('');
 
-  const arquitetoHtml = (o.arquiteto && o.arquiteto !== 'Não se aplica')
-    ? `<div>Engenheiro(a)/Arquiteto(a): ${o.arquiteto}</div>` : '<div></div>';
+  const comodosHtml = o.comodos.map(c=>`
+    <div style="background:#FBF3FA; border:1px solid #E7C9E6; border-left:5px solid #90268F; border-radius:10px; padding:16px 18px; margin-bottom:14px; page-break-inside:avoid;">
+      <div style="font-weight:bold; font-size:14.5px; color:#6B1C6B; margin-bottom:8px; font-family:Georgia,serif;">${c.ambiente}</div>
+      <div style="font-size:12.5px; line-height:1.55; color:#3a3a3a; margin-bottom:12px; font-family:Georgia,serif;">${c.descComercial||''}</div>
+      <div style="display:flex; gap:10px;">
+        <div style="flex:1; background:#ffffff; border:1px solid #E7C9E6; border-radius:8px; padding:8px 10px; text-align:center;">
+          <div style="font-size:9.5px; text-transform:uppercase; letter-spacing:.04em; color:#949697; font-family:Georgia,serif;">A prazo · até 10x</div>
+          <div style="font-size:16px; font-weight:bold; color:#333; font-family:Georgia,serif;">${money(c.totalPrazo)}</div>
+        </div>
+        <div style="flex:1; background:#90268F; border-radius:8px; padding:8px 10px; text-align:center;">
+          <div style="font-size:9.5px; text-transform:uppercase; letter-spacing:.04em; color:#F3D9F2; font-family:Georgia,serif;">À vista</div>
+          <div style="font-size:16px; font-weight:bold; color:#fff; font-family:Georgia,serif;">${money(c.totalAvista)}</div>
+        </div>
+      </div>
+    </div>`).join('');
+
+  const arquitetoLinha = (o.arquiteto && o.arquiteto !== 'Não se aplica')
+    ? `<div style="font-size:11px; opacity:.9; margin-top:2px;">Eng./Arq.: ${o.arquiteto}</div>` : '';
 
   return `
-    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
-      <img src="${LOGO_BASE64}" style="height:64px;">
-      <div style="font-size:11px; font-family:Georgia,serif; margin-top:6px;">${dataFmt}</div>
-    </div>
-    <div style="border-bottom:1px solid #999; margin-bottom:14px;"></div>
-    <div style="display:flex; justify-content:space-between; font-size:13px; font-family:Georgia,serif; margin-bottom:16px;">
-      <div>Cliente: ${o.cliente}</div>
-      ${arquitetoHtml}
-    </div>
-    <table style="width:100%; border-collapse:collapse; font-family:Georgia,serif;">
-      <thead>
-        <tr style="background:#8C2F1E; color:#fff;">
-          <th style="border:1px solid #999; padding:6px 5px; font-size:10.5px;">Quant.</th>
-          <th style="border:1px solid #999; padding:6px 5px; font-size:10.5px; text-align:left;">Descrição</th>
-          <th style="border:1px solid #999; padding:6px 5px; font-size:10.5px;">Valor a Prazo</th>
-          <th style="border:1px solid #999; padding:6px 5px; font-size:10.5px;">Valor à Vista</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${linhasHtml}
-        <tr>
-          <td colspan="2" style="border:1px solid #999; padding:7px 9px; font-weight:bold; font-size:12px; text-align:right;">TOTAL GERAL</td>
-          <td style="border:1px solid #999; text-align:center; padding:7px 5px; font-weight:bold; font-size:12px;">${money(o.totalGeralPrazo)}</td>
-          <td style="border:1px solid #999; text-align:center; padding:7px 5px; font-weight:bold; font-size:12px;">${money(o.totalGeralAvista)}</td>
-        </tr>
-      </tbody>
-    </table>
-    <div style="font-family:Georgia,serif; font-size:10.5px; margin-top:16px; line-height:1.5;">
-      <div><strong>Observação:</strong> ${TEXTO_PAGAMENTO.join(' ')}</div>
-      <div style="margin-top:8px;"><strong>Termos e Condições</strong></div>
-      ${TERMOS.map(t=>`<div>${t}</div>`).join('')}
-    </div>
-    ${o.imagem? `<div style="margin-top:18px; page-break-inside:avoid;">
-      <div style="font-family:Georgia,serif; font-size:12px; font-weight:bold; margin-bottom:8px;">Imagem Ilustrativa:</div>
-      <img src="${o.imagem}" style="max-width:60%; max-height:340px;">
-    </div>` : ''}
-    <div style="margin-top:40px; display:flex; justify-content:space-between; font-size:11px; font-family:Georgia,serif;">
-      <div>_____________________________<br>Vendedor(a)</div>
-      <div>_____________________________<br>Cliente</div>
-    </div>
-    <div style="text-align:center; font-size:9px; font-family:Georgia,serif; color:#333; margin-top:30px; border-top:1px solid #ccc; padding-top:10px;">
-      <div>Razão social: E C DECORAÇÕES EIRELI ME &nbsp;&nbsp; Nome Fantasia: AMBIENTE DECORAÇÕES</div>
-      <div>Rua Antonio Bertoncini, nº 135 - Bairro Cidade Alta - Araranguá - Santa Catarina - CEP: 88.901-022</div>
-      <div>CNPJ: 22.675.872/0001-92 &nbsp;&nbsp; INSC: 25.767.782-8</div>
-      <div>Fone (048) 3524-1574 / (048) 9616-2986</div>
-      <div>lojaambiente@hotmail.com</div>
+    <div style="font-family:Georgia,serif;">
+      <div style="text-align:center; padding:6px 0 14px;">
+        <img src="${LOGO_BASE64}" style="height:62px;">
+      </div>
+
+      <div style="background:linear-gradient(135deg, #90268F 0%, #B84FB0 100%); border-radius:12px; padding:16px 20px; display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <div style="color:#fff;">
+          <div style="font-size:10px; text-transform:uppercase; letter-spacing:.08em; opacity:.85;">Orçamento para</div>
+          <div style="font-size:19px; font-weight:bold;">${o.cliente}</div>
+          ${arquitetoLinha? `<div style="color:#F3D9F2;">${arquitetoLinha}</div>`:''}
+        </div>
+        <div style="color:#F3D9F2; text-align:right; font-size:11.5px;">${dataFmt}</div>
+      </div>
+
+      ${comodosHtml}
+
+      <div style="background:linear-gradient(135deg, #6B1C6B 0%, #90268F 100%); border-radius:12px; padding:16px 20px; margin:18px 0; display:flex; justify-content:space-between; align-items:center; color:#fff;">
+        <div style="font-size:13px; text-transform:uppercase; letter-spacing:.04em;">Total geral</div>
+        <div style="text-align:right;">
+          <div style="font-size:11px; opacity:.85;">A prazo: <strong style="font-size:14px;">${money(o.totalGeralPrazo)}</strong></div>
+          <div style="font-size:11px; opacity:.85; margin-top:2px;">À vista: <strong style="font-size:15px; color:#fff;">${money(o.totalGeralAvista)}</strong></div>
+        </div>
+      </div>
+
+      <div style="background:#F7F3E9; border:1px solid #E3DCC8; border-radius:10px; padding:14px 18px; font-size:11px; line-height:1.6; color:#4a4a3a; margin-bottom:14px;">
+        <strong style="color:#6B1C6B;">Condições de pagamento</strong><br>
+        ${TEXTO_PAGAMENTO.join(' ')}
+      </div>
+
+      <div style="background:#F5F2F0; border:1px solid #E0DAD5; border-radius:10px; padding:14px 18px; font-size:9.5px; line-height:1.65; color:#5a5a5a;">
+        <strong style="color:#6B1C6B; font-size:11px;">Termos e Condições</strong>
+        ${TERMOS.map(t=>`<div style="margin-top:4px;">${t}</div>`).join('')}
+      </div>
+
+      ${o.imagem? `<div style="margin-top:20px; text-align:center; page-break-inside:avoid;">
+        <div style="font-size:11.5px; font-weight:bold; color:#6B1C6B; margin-bottom:8px;">Imagem Ilustrativa</div>
+        <img src="${o.imagem}" style="max-width:70%; max-height:340px; border-radius:10px; border:1px solid #E7C9E6;">
+      </div>` : ''}
+
+      <div style="margin-top:36px; display:flex; justify-content:space-between; font-size:11px;">
+        <div>_____________________________<br>Vendedor(a)${o.vendedor? ': '+o.vendedor : ''}</div>
+        <div>_____________________________<br>Cliente</div>
+      </div>
+
+      <div style="text-align:center; font-size:9px; color:#8a8a8a; margin-top:26px; border-top:1px solid #e6e6e6; padding-top:10px;">
+        <div>Razão social: E C DECORAÇÕES EIRELI ME &nbsp;&nbsp; Nome Fantasia: AMBIENTE DECORAÇÕES</div>
+        <div>Rua Antonio Bertoncini, nº 135 - Bairro Cidade Alta - Araranguá - Santa Catarina - CEP: 88.901-022</div>
+        <div>CNPJ: 22.675.872/0001-92 &nbsp;&nbsp; INSC: 25.767.782-8</div>
+        <div>Fone (048) 3524-1574 / (048) 9616-2986 &nbsp;&nbsp; lojaambiente@hotmail.com</div>
+      </div>
     </div>`;
 }
 
-function imprimirOrcamento(id){
+function buildPrintProducaoHTML(o){
+  const dataFmt = dataExtensoPt(new Date(o.data));
+  const comodosHtml = o.comodos.map((c,i)=>`
+    <div style="margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid #999; page-break-inside:avoid;">
+      <div style="font-weight:bold; font-size:13.5px; background:#f0f0f0; padding:5px 8px; border:1px solid #999;">${i+1}. ${c.ambiente} — ${c.modeloNome}</div>
+      ${c.avisos.length? `<div style="background:#fdecea; border:1px solid #c0392b; color:#c0392b; font-size:10.5px; padding:6px 8px; margin-top:6px;">${c.avisos.join('<br>')}</div>` : ''}
+      <div style="font-size:11px; margin:8px 0; color:#333;">${c.descTecnica||''}</div>
+      <table style="width:100%; border-collapse:collapse; font-size:11px; margin-top:6px;">
+        <thead>
+          <tr style="background:#ddd;">
+            <th style="border:1px solid #999; padding:4px 6px; text-align:left;">Item</th>
+            <th style="border:1px solid #999; padding:4px 6px;">Quantidade</th>
+            <th style="border:1px solid #999; padding:4px 6px;">Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${c.materiais.map(m=>`<tr><td style="border:1px solid #999; padding:4px 6px;">${m.nome}</td><td style="border:1px solid #999; text-align:center; padding:4px 6px;">${m.qtd}</td><td style="border:1px solid #999; text-align:right; padding:4px 6px;">${money(m.valor)}</td></tr>`).join('')}
+          ${c.maoObraTotal? `<tr><td style="border:1px solid #999; padding:4px 6px;">Mão de obra</td><td style="border:1px solid #999; text-align:center; padding:4px 6px;">—</td><td style="border:1px solid #999; text-align:right; padding:4px 6px;">${money(c.maoObraTotal)}</td></tr>`:''}
+          <tr><td style="border:1px solid #999; padding:4px 6px;">Instalação</td><td style="border:1px solid #999; text-align:center; padding:4px 6px;">—</td><td style="border:1px solid #999; text-align:right; padding:4px 6px;">${money(c.instalacaoTotal)}</td></tr>
+        </tbody>
+      </table>
+      <div style="text-align:right; margin-top:6px; font-size:11.5px; font-weight:bold;">Subtotal ${c.ambiente} (a prazo): ${money(c.totalPrazo)}</div>
+    </div>`).join('');
+
+  return `
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+      <img src="${LOGO_BASE64}" style="height:56px;">
+      <div style="text-align:right; font-family:Georgia,serif;">
+        <div style="font-size:15px; font-weight:bold;">ORDEM DE PRODUÇÃO</div>
+        <div style="font-size:11px;">${dataFmt}</div>
+      </div>
+    </div>
+    <div style="border-bottom:1px solid #999; margin-bottom:12px;"></div>
+    <div style="display:flex; justify-content:space-between; font-size:12.5px; font-family:Georgia,serif; margin-bottom:14px;">
+      <div>Cliente: ${o.cliente}</div>
+      <div>Vendedor(a): ${o.vendedor||'-'}</div>
+    </div>
+    ${o.arquiteto && o.arquiteto!=='Não se aplica' ? `<div style="font-size:12px; font-family:Georgia,serif; margin-bottom:14px;">Engenheiro(a)/Arquiteto(a): ${o.arquiteto}</div>` : ''}
+    ${comodosHtml}
+    <div style="text-align:right; font-size:14px; font-weight:bold; margin-top:10px; border-top:2px solid #000; padding-top:10px; font-family:Georgia,serif;">
+      TOTAL GERAL (a prazo): ${money(o.totalGeralPrazo)} &nbsp;|&nbsp; (à vista): ${money(o.totalGeralAvista)}
+    </div>
+    ${o.imagem? `<div style="margin-top:18px; page-break-inside:avoid;">
+      <div style="font-family:Georgia,serif; font-size:12px; font-weight:bold; margin-bottom:8px;">Imagem de referência:</div>
+      <img src="${o.imagem}" style="max-width:60%; max-height:340px;">
+    </div>` : ''}
+    <div style="text-align:center; font-size:9px; font-family:Georgia,serif; color:#333; margin-top:26px; border-top:1px solid #ccc; padding-top:8px;">
+      Documento interno de produção — não enviar ao cliente.
+    </div>`;
+}
+
+function imprimirOrcamentoCliente(id){
   const raw = DB.orcamentos.find(o=>o.id===id);
   if(!raw) return;
   const o = normalizeOrcamento(raw);
   document.getElementById('print-area').innerHTML = buildPrintHTML(o);
   window.print();
+}
+
+function imprimirOrcamentoProducao(id){
+  const raw = DB.orcamentos.find(o=>o.id===id);
+  if(!raw) return;
+  const o = normalizeOrcamento(raw);
+  document.getElementById('print-area').innerHTML = buildPrintProducaoHTML(o);
+  window.print();
+}
+
+// mantido por compatibilidade com botões antigos
+function imprimirOrcamento(id){
+  imprimirOrcamentoCliente(id);
 }
 
 /* ---------------------------------------------------------------
@@ -1195,7 +1318,8 @@ function renderOrcamentos(){
       </div>
       <div style="display:flex; align-items:center; gap:12px;">
         <div class="val">${money(o.totalGeralPrazo)} <span style="font-size:11px; color:var(--ink-soft); font-weight:400;">(à vista ${money(o.totalGeralAvista)})</span></div>
-        <button class="btn small ghost" onclick="imprimirOrcamento('${raw.id}')">Imprimir</button>
+        <button class="btn small ghost" onclick="imprimirOrcamentoCliente('${raw.id}')">Cliente</button>
+        <button class="btn small ghost" onclick="imprimirOrcamentoProducao('${raw.id}')">Produção</button>
       </div>
     </div>`;
   }).join('');
