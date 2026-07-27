@@ -542,7 +542,7 @@ function seed(){
     {id:uid(), nome:'Cortina de Ilhós', tipo:'cortina', fator:2.5, arredondarFranzido:false, usaBainha:false, fatorReporte:2, usaFitaWave:false, usaIlhos:true, espIlhos:0.14, espDeslizante:0},
     {id:uid(), nome:'Cortina Prega Americana', tipo:'cortina', fator:3, usaBainha:true, fatorReporte:2, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0},
     {id:uid(), nome:'Cortina Macho', tipo:'cortina', fator:3, usaBainha:true, fatorReporte:2, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0},
-    {id:uid(), nome:'Persiana Rolô', tipo:'persiana', fator:1, usaBainha:false, fatorReporte:0, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0, areaMinima:1.2, permiteBando:true, imagemPadrao:IMG_PERSIANA_ROLO_SCREEN},
+    {id:uid(), nome:'Persiana Rolô', tipo:'persiana', fator:1, usaBainha:false, fatorReporte:0, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0, areaMinima:1.2, instalacaoMinimaLinear:1.4, permiteBando:true, imagemPadrao:IMG_PERSIANA_ROLO_SCREEN},
     {id:uid(), nome:'Persiana Horizontal', tipo:'persiana', fator:1, usaBainha:false, fatorReporte:0, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0, areaMinima:1.0, permiteBando:false},
     {id:uid(), nome:'Persiana Romana Tradicional', tipo:'persiana', fator:1, usaBainha:false, fatorReporte:0, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0, areaMinima:1.0, permiteBando:false},
     {id:uid(), nome:'Persiana Romana Cascata', tipo:'persiana', fator:1, usaBainha:false, fatorReporte:0, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0, areaMinima:1.0, permiteBando:false},
@@ -753,7 +753,7 @@ function renderModelos(){
     <td>${m.tipo==='persiana' ? (m.permiteBando?'Sim':'Não') : '—'}</td>
     <td>${m.imagemPadrao? `<img src="${m.imagemPadrao}" style="width:44px; height:44px; object-fit:cover; border-radius:4px; border:1px solid var(--line);">` : '<span class="hint" style="margin:0;">nenhuma</span>'}</td>
     <td>
-      ${m.tipo==='cortina' ? `<button class="edit-btn" onclick="editarValor('modelos','${m.id}','fator','Fator de franzido (× largura)')">fator</button><button class="edit-btn" onclick="editarValor('modelos','${m.id}','fatorReporte','Fator de reporte (÷ franzido)')">report.</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','usaBainha')">bainha</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','arredondarFranzido')">arred.</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','usaFitaWave')">wave</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','usaIlhos')">ilhós</button>` : `<button class="edit-btn" onclick="editarValor('modelos','${m.id}','areaMinima','Área mínima cobrada (m²)')">área mín.</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','permiteBando')">bandô</button>`}
+      ${m.tipo==='cortina' ? `<button class="edit-btn" onclick="editarValor('modelos','${m.id}','fator','Fator de franzido (× largura)')">fator</button><button class="edit-btn" onclick="editarValor('modelos','${m.id}','fatorReporte','Fator de reporte (÷ franzido)')">report.</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','usaBainha')">bainha</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','arredondarFranzido')">arred.</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','usaFitaWave')">wave</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','usaIlhos')">ilhós</button>` : `<button class="edit-btn" onclick="editarValor('modelos','${m.id}','areaMinima','Área mínima cobrada (m²)')">área mín.</button><button class="edit-btn" onclick="editarValor('modelos','${m.id}','instalacaoMinimaLinear','Mínimo linear de instalação (m)')">inst. mín.</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','permiteBando')">bandô</button>`}
       <button class="edit-btn" onclick="document.getElementById('img-modelo-${m.id}').click()">imagem</button>
       <input type="file" id="img-modelo-${m.id}" accept="image/*" style="display:none;" onchange="uploadImagemModelo(event,'${m.id}')">
       <button class="del-btn" onclick="delItem('modelos','${m.id}')">remover</button>
@@ -1237,7 +1237,8 @@ function calcularComodo(){
       avisos.push('Enrolamento por trás: vai ficar um espaçamento entre o tecido e a parede/janela — já avise o cliente.');
     }
 
-    instalacaoTotal = Math.max(round2(roundUp10cm(larguraCalc) * instalador.valorMetro), instalador.valorMinimo) + (instalador.valorDeslocamento||0);
+    const metrosInstalacaoPersiana = Math.max(roundUp10cm(larguraCalc), modelo.instalacaoMinimaLinear||0);
+    instalacaoTotal = Math.max(round2(metrosInstalacaoPersiana * instalador.valorMetro), instalador.valorMinimo) + (instalador.valorDeslocamento||0);
 
     const bandoTxt = (modelo.permiteBando && incluiBando) ? ', com bandô' : (modelo.permiteBando ? ', sem bandô' : '');
     const enrolamentoTxt = enrolamento ? `, enrolamento pela ${enrolamento.toLowerCase()}` : '';
