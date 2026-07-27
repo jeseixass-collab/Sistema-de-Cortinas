@@ -321,6 +321,25 @@
         <div class="field"><label>Ponteiras (un)</label><input id="f-ponteiras" type="number" min="0" value="2"></div>
       </div>
 
+      <div class="formgrid" id="wrap-persiana-extra" style="display:none;">
+        <div class="field">
+          <label>Instalação</label>
+          <select id="f-vao" onchange="onChangePersianaExtra()">
+            <option value="fora">Fora do vão (+30cm larg. / +30cm alt.)</option>
+            <option value="dentro">Dentro do vão (medida exata)</option>
+          </select>
+        </div>
+        <div class="field" id="wrap-bando">
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="f-bando" style="width:auto;" onchange="onChangePersianaExtra()"> Incluir bandô
+          </label>
+        </div>
+        <div class="field" id="wrap-enrolamento" style="display:none;">
+          <label>Enrolamento (sem bandô)</label>
+          <select id="f-enrolamento"><option value="">Selecione...</option><option value="Frente">Frente</option><option value="Trás">Trás</option></select>
+        </div>
+      </div>
+
       <div class="formgrid">        <div class="field full">
           <label>Observações</label>
           <textarea id="f-obs" placeholder="Detalhes adicionais para o orçamento..."></textarea>
@@ -432,8 +451,8 @@ function seed(){
     {id:uid(), codigo:'VC-002', nome:'Voil Cristal', spec:'Voil', aplicacao:'cortina', tipo:'Principal', largura:2.80, valor:38},
     {id:uid(), codigo:'BL-003', nome:'Blackout Liso Grafite', spec:'Blackout', aplicacao:'cortina', tipo:'Blackout', largura:2.80, valor:52},
     {id:uid(), codigo:'FM-004', nome:'Forro Microfibra', spec:'Forro Microfibra', aplicacao:'cortina', tipo:'Forro', largura:2.80, valor:28},
-    {id:uid(), codigo:'TS-005', nome:'Tela Solar 5%', spec:'Tela Solar', aplicacao:'persiana', tipo:'Persiana', largura:2.50, valor:69},
-    {id:uid(), codigo:'PH-006', nome:'Persiana Horizontal Alumínio', spec:'Alumínio 25mm', aplicacao:'persiana', tipo:'Persiana', largura:0, valor:89},
+    {id:uid(), codigo:'TS-005', nome:'Tela Solar 5%', spec:'Tela Solar', aplicacao:'persiana', tipo:'Persiana', linhaScreen:true, largura:2.50, valor:69},
+    {id:uid(), codigo:'PH-006', nome:'Persiana Horizontal Alumínio', spec:'Alumínio 25mm', aplicacao:'persiana', tipo:'Persiana', linhaScreen:false, largura:0, valor:89},
   ];
   DB.trilhos = [
     {id:uid(), nome:'Trilho Suíço Simples', valorMetro:28},
@@ -458,14 +477,18 @@ function seed(){
     {id:uid(), nome:'Entretela', unidade:'m', valor:2.5},
     {id:uid(), nome:'Tubo Suíço', unidade:'m', valor:22.0},
     {id:uid(), nome:'Ilhós', unidade:'un', valor:2.5},
+    {id:uid(), nome:'Bandô', unidade:'m', valor:35.0},
   ];
   DB.modelos = [
     {id:uid(), nome:'Cortina Wave', tipo:'cortina', fator:3, usaBainha:true, fatorReporte:2, usaFitaWave:true, usaIlhos:false, espIlhos:0.15, espDeslizante:0.08},
-    {id:uid(), nome:'Cortina de Ilhós', tipo:'cortina', fator:3, usaBainha:true, fatorReporte:2, usaFitaWave:false, usaIlhos:true, espIlhos:0.15, espDeslizante:0},
+    {id:uid(), nome:'Cortina de Ilhós', tipo:'cortina', fator:2.5, arredondarFranzido:false, usaBainha:false, fatorReporte:2, usaFitaWave:false, usaIlhos:true, espIlhos:0.14, espDeslizante:0},
     {id:uid(), nome:'Cortina Prega Americana', tipo:'cortina', fator:3, usaBainha:true, fatorReporte:2, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0},
     {id:uid(), nome:'Cortina Macho', tipo:'cortina', fator:3, usaBainha:true, fatorReporte:2, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0},
-    {id:uid(), nome:'Persiana Rolô', tipo:'persiana', fator:1, usaBainha:false, fatorReporte:0, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0},
-    {id:uid(), nome:'Persiana Horizontal', tipo:'persiana', fator:1, usaBainha:false, fatorReporte:0, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0},
+    {id:uid(), nome:'Persiana Rolô', tipo:'persiana', fator:1, usaBainha:false, fatorReporte:0, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0, areaMinima:1.0, permiteBando:true},
+    {id:uid(), nome:'Persiana Horizontal', tipo:'persiana', fator:1, usaBainha:false, fatorReporte:0, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0, areaMinima:1.0, permiteBando:false},
+    {id:uid(), nome:'Persiana Romana Tradicional', tipo:'persiana', fator:1, usaBainha:false, fatorReporte:0, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0, areaMinima:1.0, permiteBando:false},
+    {id:uid(), nome:'Persiana Romana Cascata', tipo:'persiana', fator:1, usaBainha:false, fatorReporte:0, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0, areaMinima:1.0, permiteBando:false},
+    {id:uid(), nome:'Persiana Vertical', tipo:'persiana', fator:1, usaBainha:false, fatorReporte:0, usaFitaWave:false, usaIlhos:false, espIlhos:0, espDeslizante:0, areaMinima:1.0, permiteBando:false},
   ];
   DB.orcamentos = [];
 }
@@ -504,12 +527,13 @@ function renderTecidos(){
       <td>${t.tipo}</td>
       <td class="num">${t.largura? t.largura+' m' : '-'}</td>
       <td class="num">${money(t.valor)}/m</td>
-      <td><button class="edit-btn" onclick="editarValor('tecidos','${t.id}','valor','Valor por metro')">R$</button><button class="edit-btn" onclick="editarValor('tecidos','${t.id}','largura','Largura do rolo (m)')">larg.</button><button class="del-btn" onclick="delItem('tecidos','${t.id}')">remover</button></td>
+      <td>${t.aplicacao==='persiana' ? (t.linhaScreen? 'Sim':'Não') : '—'}</td>
+      <td><button class="edit-btn" onclick="editarValor('tecidos','${t.id}','valor','Valor por metro')">R$</button><button class="edit-btn" onclick="editarValor('tecidos','${t.id}','largura','Largura do rolo (m)')">larg.</button>${t.aplicacao==='persiana' ? `<button class="edit-btn" onclick="toggleBooleano('tecidos','${t.id}','linhaScreen')">screen</button>` : ''}<button class="del-btn" onclick="delItem('tecidos','${t.id}')">remover</button></td>
     </tr>`).join('');
   el.innerHTML = `
-    <table><thead><tr><th>Código</th><th>Nome</th><th>Especificação</th><th>Aplicação</th><th>Tipo</th><th>Largura rolo</th><th>Valor/m</th><th></th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="8" class="empty">Nenhum tecido cadastrado</td></tr>'}</tbody></table>
-    <p class="hint">"Aplicação" define se o material aparece no orçamento quando o modelo escolhido for uma cortina ou uma persiana — assim tecido de cortina nunca aparece pra persiana, e vice-versa.</p>
+    <table><thead><tr><th>Código</th><th>Nome</th><th>Especificação</th><th>Aplicação</th><th>Tipo</th><th>Largura rolo</th><th>Valor/m</th><th>Linha Screen</th><th></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="9" class="empty">Nenhum tecido cadastrado</td></tr>'}</tbody></table>
+    <p class="hint">"Aplicação" define se o material aparece no orçamento quando o modelo escolhido for uma cortina ou uma persiana. "Linha Screen" só vale pra persianas — quando marcado, o bandô vira obrigatório no orçamento.</p>
     <div class="formgrid">
       <div class="field"><label>Código do material</label><input id="nt-codigo" placeholder="ex: LN-045"></div>
       <div class="field"><label>Nome</label><input id="nt-nome" placeholder="ex: Linho Cru"></div>
@@ -523,6 +547,9 @@ function renderTecidos(){
       <div class="field" id="wrap-nt-tipo"><label>Tipo</label>
         <select id="nt-tipo"><option>Principal</option><option>Forro</option><option>Blackout</option><option>Outro</option></select>
       </div>
+      <div class="field" id="wrap-nt-screen" style="display:none;"><label>Linha Screen (bandô obrigatório)?</label>
+        <select id="nt-screen"><option value="false">Não</option><option value="true">Sim</option></select>
+      </div>
       <div class="field"><label>Largura do rolo (m)</label><input id="nt-largura" type="number" step="0.01" min="0" placeholder="ex: 2.80"></div>
       <div class="field"><label>Valor por metro (R$)</label><input id="nt-valor" type="number" step="0.01" min="0"></div>
     </div>
@@ -531,6 +558,7 @@ function renderTecidos(){
 function onChangeAplicacaoTecido(){
   const isPersiana = document.getElementById('nt-aplicacao').value === 'persiana';
   document.getElementById('wrap-nt-tipo').style.display = isPersiana ? 'none' : 'flex';
+  document.getElementById('wrap-nt-screen').style.display = isPersiana ? 'flex' : 'none';
 }
 function addTecido(){
   const nome=document.getElementById('nt-nome').value.trim();
@@ -540,6 +568,7 @@ function addTecido(){
   DB.tecidos.push({id:uid(), codigo:document.getElementById('nt-codigo').value.trim()||'-', nome,
     spec:document.getElementById('nt-spec').value.trim()||'-', aplicacao,
     tipo: aplicacao==='persiana' ? 'Persiana' : document.getElementById('nt-tipo').value,
+    linhaScreen: aplicacao==='persiana' ? (document.getElementById('nt-screen').value==='true') : false,
     largura:parseFloat(document.getElementById('nt-largura').value)||0, valor});
   saveDB(); renderTecidos(); populateSelects();
 }
@@ -661,20 +690,24 @@ function renderModelos(){
     <td class="num">${m.tipo==='cortina' ? 'x'+m.fator : '—'}</td>
     <td>${m.tipo==='cortina' ? (m.usaBainha? '÷'+(m.fatorReporte||2) : 'Não') : '—'}</td>
     <td>${m.usaFitaWave?'Sim':'Não'}</td><td>${m.usaIlhos?'Sim':'Não'}</td>
+    <td>${m.tipo==='persiana' ? (m.areaMinima||'-')+' m²' : '—'}</td>
+    <td>${m.tipo==='persiana' ? (m.permiteBando?'Sim':'Não') : '—'}</td>
     <td>
-      ${m.tipo==='cortina' ? `<button class="edit-btn" onclick="editarValor('modelos','${m.id}','fator','Fator de franzido (× largura)')">fator</button><button class="edit-btn" onclick="editarValor('modelos','${m.id}','fatorReporte','Fator de reporte (÷ franzido)')">report.</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','usaBainha')">bainha</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','usaFitaWave')">wave</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','usaIlhos')">ilhós</button>` : ''}
+      ${m.tipo==='cortina' ? `<button class="edit-btn" onclick="editarValor('modelos','${m.id}','fator','Fator de franzido (× largura)')">fator</button><button class="edit-btn" onclick="editarValor('modelos','${m.id}','fatorReporte','Fator de reporte (÷ franzido)')">report.</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','usaBainha')">bainha</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','arredondarFranzido')">arred.</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','usaFitaWave')">wave</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','usaIlhos')">ilhós</button>` : `<button class="edit-btn" onclick="editarValor('modelos','${m.id}','areaMinima','Área mínima cobrada (m²)')">área mín.</button><button class="edit-btn" onclick="toggleBooleano('modelos','${m.id}','permiteBando')">bandô</button>`}
       <button class="del-btn" onclick="delItem('modelos','${m.id}')">remover</button>
     </td></tr>`).join('');
   el.innerHTML = `
-    <table><thead><tr><th>Modelo</th><th>Fator de franzido</th><th>Reporte (bainha)</th><th>Usa fita Wave</th><th>Usa ilhós</th><th></th></tr></thead>
+    <table><thead><tr><th>Modelo</th><th>Fator de franzido</th><th>Reporte (bainha)</th><th>Usa fita Wave</th><th>Usa ilhós</th><th>Área mínima</th><th>Permite bandô</th><th></th></tr></thead>
     <tbody>${rows}</tbody></table>
-    <p class="hint">Regra padrão da loja: franzido = largura × 3 (arred. p/ cima); reporte de bainha = franzido ÷ 2, somado só no tecido principal (o forro usa apenas o franzido, sem reporte). Persianas não usam nada disso — o cálculo é por área (m²). Os botões "bainha", "wave" e "ilhós" alternam entre Sim/Não a cada clique.</p>
+    <p class="hint">Regra padrão da loja: franzido = largura × 3 (arred. p/ cima); reporte de bainha = franzido ÷ 2, somado só no tecido principal (o forro usa apenas o franzido, sem reporte). Persianas usam área mínima cobrada e podem ou não permitir bandô — quando o tecido é linha Screen, o bandô vira obrigatório automaticamente no orçamento.</p>
     <div class="formgrid">
       <div class="field"><label>Nome</label><input id="nm-nome" placeholder="ex: Cortina Painel"></div>
       <div class="field"><label>Tipo</label>
         <select id="nm-tipo"><option value="cortina">Cortina (franzido)</option><option value="persiana">Persiana (área)</option></select>
       </div>
       <div class="field"><label>Fator de franzido (× largura)</label><input id="nm-fator" type="number" step="0.1" value="3"></div>
+      <div class="field"><label>Área mínima cobrada (m², só persiana)</label><input id="nm-areamin" type="number" step="0.1" value="1.0"></div>
+      <div class="field"><label>Permite bandô? (só persiana)</label><select id="nm-bando"><option value="false">Não</option><option value="true">Sim</option></select></div>
       <div class="field"><label>Tem bainha colocada (reporte)?</label><select id="nm-bainha"><option value="true">Sim</option><option value="false">Não</option></select></div>
       <div class="field"><label>Fator de reporte (÷ franzido)</label><input id="nm-reporte" type="number" step="0.1" value="2"></div>
       <div class="field"><label>Usa fita Wave?</label><select id="nm-wave"><option value="false">Não</option><option value="true">Sim</option></select></div>
@@ -691,6 +724,8 @@ function addModelo(){
     fatorReporte:parseFloat(document.getElementById('nm-reporte').value)||2,
     usaFitaWave:document.getElementById('nm-wave').value==='true',
     usaIlhos:document.getElementById('nm-ilhos').value==='true',
+    areaMinima:parseFloat(document.getElementById('nm-areamin').value)||1.0,
+    permiteBando:document.getElementById('nm-bando').value==='true',
     espIlhos:0.15, espDeslizante:0.08});
   saveDB(); renderModelos(); populateSelects();
 }
@@ -757,6 +792,7 @@ function toggleModeloFields(){
   ['wrap-forro','wrap-trilho','wrap-folhas','wrap-abertura','wrap-costureira','wrap-acessorios-trilho'].forEach(id=>{
     document.getElementById(id).style.display = isCortina ? 'flex' : 'none';
   });
+  document.getElementById('wrap-persiana-extra').style.display = isCortina ? 'none' : 'flex';
 
   // Filtra os tecidos/materiais disponíveis conforme a aplicação do modelo (cortina x persiana)
   const aplicacaoAlvo = isCortina ? 'cortina' : 'persiana';
@@ -767,7 +803,36 @@ function toggleModeloFields(){
 
   const forroSel = document.getElementById('f-forro');
   forroSel.innerHTML = '<option value="">Sem forro</option>' + DB.tecidos.filter(t=>t.tipo==='Forro' && (t.aplicacao||'cortina')==='cortina').map(t=>`<option value="${t.id}">${t.codigo&&t.codigo!=='-'? '['+t.codigo+'] ':''}${t.nome} (${money(t.valor)}/m)</option>`).join('');
+
+  if(!isCortina) atualizarCamposPersiana();
 }
+
+function atualizarCamposPersiana(){
+  const modelo = DB.modelos.find(m=>m.id===document.getElementById('f-modelo').value);
+  const tecido = DB.tecidos.find(t=>t.id===document.getElementById('f-tecido').value);
+  const permiteBando = !!(modelo && modelo.permiteBando);
+  const bandoWrap = document.getElementById('wrap-bando');
+  const bandoInput = document.getElementById('f-bando');
+  bandoWrap.style.display = permiteBando ? 'flex' : 'none';
+  if(!permiteBando){ bandoInput.checked = false; bandoInput.disabled = false; }
+  const isScreen = !!(tecido && tecido.linhaScreen);
+  if(permiteBando && isScreen){
+    bandoInput.checked = true;
+    bandoInput.disabled = true;
+  } else if(permiteBando){
+    bandoInput.disabled = false;
+  }
+  onChangePersianaExtra();
+}
+document.getElementById('f-tecido').addEventListener('change', atualizarCamposPersiana);
+
+function onChangePersianaExtra(){
+  const modelo = DB.modelos.find(m=>m.id===document.getElementById('f-modelo').value);
+  const isRolo = !!(modelo && modelo.nome.toLowerCase().includes('rol'));
+  const bandoChecked = document.getElementById('f-bando').checked;
+  document.getElementById('wrap-enrolamento').style.display = (isRolo && !bandoChecked) ? 'flex' : 'none';
+}
+
 
 /* ---------------------------------------------------------------
    CÁLCULO DO ORÇAMENTO
@@ -853,7 +918,9 @@ function calcularComodo(){
       avisos.push(`Altura (${altura}m) acima do limite de ${costureira.nome} (${costureira.alturaMax}m). Considere outra costureira ou emenda.`);
     }
 
-    let metrosFranzido = roundUp(largura * modelo.fator);
+    let metrosFranzido = largura * modelo.fator;
+    if(modelo.arredondarFranzido !== false) metrosFranzido = roundUp(metrosFranzido);
+    metrosFranzido = round2(metrosFranzido);
     let reporte = modelo.usaBainha ? round2(metrosFranzido / (modelo.fatorReporte||2)) : 0;
     let consumoTecido = round2(metrosFranzido + reporte);
     let consumoForro = metrosFranzido; // forro não leva bainha/reporte
@@ -894,7 +961,7 @@ function calcularComodo(){
     // Ilhós
     if(modelo.usaIlhos){
       const ilhos = DB.acessorios.find(a=>a.nome.toLowerCase()==='ilhós' || a.nome.toLowerCase()==='ilhos');
-      let qtdIlhos = roundUp(metrosFranzido / (modelo.espIlhos||0.15)) + 1;
+      let qtdIlhos = roundUp(metrosFranzido / (modelo.espIlhos||0.15));
       if(ilhos){
         let v = round2(qtdIlhos * ilhos.valor);
         materiais.push({nome:'Ilhós', qtd:`${qtdIlhos} un`, valor:v});
@@ -972,16 +1039,52 @@ function calcularComodo(){
       alert('Selecione um instalador.');
       return null;
     }
-    let area = round2(largura * altura);
+
+    const tipoVao = document.getElementById('f-vao').value; // 'fora' ou 'dentro'
+    const incluiBando = document.getElementById('f-bando').checked;
+    const enrolamento = document.getElementById('f-enrolamento').value;
+
+    let larguraCalc = largura, alturaCalc = altura;
+    if(tipoVao === 'fora'){
+      larguraCalc = round2(largura + 0.30); // 15cm de cada lado
+      alturaCalc = round2(altura + 0.30);
+    }
+
+    let area = round2(larguraCalc * alturaCalc);
+    const areaMinima = modelo.areaMinima || 0;
+    if(areaMinima && area < areaMinima){
+      avisos.push(`Área calculada (${area} m²) abaixo do mínimo cobrado pela loja (${areaMinima} m²) — o sistema já aplicou o mínimo no valor.`);
+      area = areaMinima;
+    }
+
     let valorMaterial = round2(area * tecido.valor);
     descontoTotal += round2(valorMaterial * DESCONTO_AVISTA_PCT);
     materiais.push({nome:`${tecido.nome}`, qtd:`${area} m²`, valor:valorMaterial});
     materialTotal += valorMaterial;
 
+    if(modelo.permiteBando && incluiBando){
+      const bando = DB.acessorios.find(a=>a.nome.toLowerCase()==='bandô' || a.nome.toLowerCase()==='bando');
+      if(bando){
+        let vBando = round2(larguraCalc * bando.valor);
+        materiais.push({nome:'Bandô', qtd:`${larguraCalc} m`, valor:vBando});
+        materialTotal += vBando;
+      }
+    }
+    if(modelo.permiteBando && !incluiBando && modelo.nome.toLowerCase().includes('rol') && !enrolamento){
+      avisos.push('Selecione o enrolamento (Frente ou Trás) — obrigatório pra persiana Rolô sem bandô.');
+    }
+    if(enrolamento === 'Trás'){
+      avisos.push('Enrolamento por trás: vai ficar um espaçamento entre o tecido e a parede/janela — já avise o cliente.');
+    }
+
     instalacaoTotal = Math.max(round2(roundUp10cm(largura) * instalador.valorMetro), instalador.valorMinimo) + (instalador.valorDeslocamento||0);
 
-    descTecnica = `${modelo.nome} — largura ${largura}m x altura ${altura}m (${area} m²). Material: ${tecido.nome}. Instalação: ${instalador.nome}.`;
-    descComercial = `${modelo.nome}, medindo ${largura}m de largura × ${altura}m de altura, confeccionada em ${tecido.nome.toLowerCase()}, sob medida, incluindo material, acessórios de fixação e instalação completa.`;
+    const bandoTxt = (modelo.permiteBando && incluiBando) ? ', com bandô' : (modelo.permiteBando ? ', sem bandô' : '');
+    const enrolamentoTxt = enrolamento ? `, enrolamento pela ${enrolamento.toLowerCase()}` : '';
+    const vaoTxt = tipoVao === 'fora' ? 'instalação fora do vão' : 'instalação dentro do vão';
+
+    descTecnica = `${modelo.nome} — largura ${largura}m x altura ${altura}m (medida calculada: ${larguraCalc}m x ${alturaCalc}m = ${area} m²). ${vaoTxt}${bandoTxt}${enrolamentoTxt}. Material: ${tecido.nome}. Instalação: ${instalador.nome}.`;
+    descComercial = `${modelo.nome}, medindo ${largura}m de largura × ${altura}m de altura, confeccionada em ${tecido.nome.toLowerCase()}, sob medida${bandoTxt}, incluindo suporte e instalação.`;
   }
 
   const totalPrazo = round2(materialTotal + maoObraTotal + instalacaoTotal);
@@ -1155,68 +1258,88 @@ function buildPrintHTML(o){
   const dataFmt = dataExtensoPt(new Date(o.data));
 
   const comodosHtml = o.comodos.map(c=>`
-    <div style="background:#FBF3FA; border:1px solid #E7C9E6; border-left:5px solid #90268F; border-radius:10px; padding:16px 18px; margin-bottom:14px; page-break-inside:avoid;">
-      <div style="font-weight:bold; font-size:14.5px; color:#6B1C6B; margin-bottom:8px; font-family:Georgia,serif;">${c.ambiente}</div>
-      <div style="font-size:12.5px; line-height:1.55; color:#3a3a3a; margin-bottom:12px; font-family:Georgia,serif;">${c.descComercial||''}</div>
-      <div style="display:flex; gap:10px;">
-        <div style="flex:1; background:#ffffff; border:1px solid #E7C9E6; border-radius:8px; padding:8px 10px; text-align:center;">
-          <div style="font-size:9.5px; text-transform:uppercase; letter-spacing:.04em; color:#949697; font-family:Georgia,serif;">A prazo · até 10x</div>
-          <div style="font-size:16px; font-weight:bold; color:#333; font-family:Georgia,serif;">${money(c.totalPrazo)}</div>
-        </div>
-        <div style="flex:1; background:#90268F; border-radius:8px; padding:8px 10px; text-align:center;">
-          <div style="font-size:9.5px; text-transform:uppercase; letter-spacing:.04em; color:#F3D9F2; font-family:Georgia,serif;">À vista</div>
-          <div style="font-size:16px; font-weight:bold; color:#fff; font-family:Georgia,serif;">${money(c.totalAvista)}</div>
-        </div>
-      </div>
-    </div>`).join('');
+    <table style="width:100%; border-collapse:collapse; margin-bottom:12px; page-break-inside:avoid;">
+      <tr>
+        <td style="border:1px solid #E3D3E2; border-left:3px solid #90268F; border-radius:6px; padding:14px 16px;">
+          <div style="font-weight:bold; font-size:13.5px; color:#6B1C6B; margin-bottom:7px; font-family:Georgia,serif;">${c.ambiente}</div>
+          <div style="font-size:12px; line-height:1.55; color:#3a3a3a; margin-bottom:10px; font-family:Georgia,serif;">${c.descComercial||''}</div>
+          <table style="width:100%; border-collapse:collapse;">
+            <tr>
+              <td style="width:50%; border:1px solid #E3D3E2; border-radius:4px; padding:7px 10px; text-align:center;">
+                <div style="font-size:9px; text-transform:uppercase; letter-spacing:.04em; color:#949697; font-family:Georgia,serif;">A prazo · até 10x</div>
+                <div style="font-size:14.5px; font-weight:bold; color:#333; font-family:Georgia,serif;">${money(c.totalPrazo)}</div>
+              </td>
+              <td style="width:6px;"></td>
+              <td style="width:50%; border:1px solid #90268F; border-radius:4px; padding:7px 10px; text-align:center;">
+                <div style="font-size:9px; text-transform:uppercase; letter-spacing:.04em; color:#90268F; font-family:Georgia,serif;">À vista</div>
+                <div style="font-size:14.5px; font-weight:bold; color:#90268F; font-family:Georgia,serif;">${money(c.totalAvista)}</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>`).join('');
 
   const arquitetoLinha = (o.arquiteto && o.arquiteto !== 'Não se aplica')
-    ? `<div style="font-size:11px; opacity:.9; margin-top:2px;">Eng./Arq.: ${o.arquiteto}</div>` : '';
+    ? `Eng./Arq.: ${o.arquiteto}` : '';
 
   return `
-    <div style="font-family:Georgia,serif;">
-      <div style="text-align:center; padding:6px 0 14px;">
-        <img src="${LOGO_BASE64}" style="height:62px;">
+    <div style="font-family:Georgia,serif; color:#333;">
+      <div style="text-align:center; padding:4px 0 10px;">
+        <img src="${LOGO_BASE64}" alt="Loja Ambiente" style="height:60px; display:inline-block;">
       </div>
+      <div style="border-top:2px solid #90268F; margin-bottom:14px;"></div>
 
-      <div style="background:linear-gradient(135deg, #90268F 0%, #B84FB0 100%); border-radius:12px; padding:16px 20px; display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-        <div style="color:#fff;">
-          <div style="font-size:10px; text-transform:uppercase; letter-spacing:.08em; opacity:.85;">Orçamento para</div>
-          <div style="font-size:19px; font-weight:bold;">${o.cliente}</div>
-          ${arquitetoLinha? `<div style="color:#F3D9F2;">${arquitetoLinha}</div>`:''}
-        </div>
-        <div style="color:#F3D9F2; text-align:right; font-size:11.5px;">${dataFmt}</div>
-      </div>
+      <table style="width:100%; border-collapse:collapse; margin-bottom:18px;">
+        <tr>
+          <td style="font-size:16px; font-weight:bold; color:#6B1C6B;">${o.cliente}</td>
+          <td style="text-align:right; font-size:11px; color:#777; vertical-align:top;">${dataFmt}</td>
+        </tr>
+        ${arquitetoLinha? `<tr><td colspan="2" style="font-size:11px; color:#777; padding-top:2px;">${arquitetoLinha}</td></tr>` : ''}
+      </table>
 
       ${comodosHtml}
 
-      <div style="background:linear-gradient(135deg, #6B1C6B 0%, #90268F 100%); border-radius:12px; padding:16px 20px; margin:18px 0; display:flex; justify-content:space-between; align-items:center; color:#fff;">
-        <div style="font-size:13px; text-transform:uppercase; letter-spacing:.04em;">Total geral</div>
-        <div style="text-align:right;">
-          <div style="font-size:11px; opacity:.85;">A prazo: <strong style="font-size:14px;">${money(o.totalGeralPrazo)}</strong></div>
-          <div style="font-size:11px; opacity:.85; margin-top:2px;">À vista: <strong style="font-size:15px; color:#fff;">${money(o.totalGeralAvista)}</strong></div>
-        </div>
-      </div>
+      <table style="width:100%; border-collapse:collapse; margin:16px 0;">
+        <tr>
+          <td style="border:1.5px solid #90268F; border-radius:6px; padding:12px 16px;">
+            <table style="width:100%; border-collapse:collapse;">
+              <tr>
+                <td style="font-size:12.5px; text-transform:uppercase; letter-spacing:.04em; color:#6B1C6B; font-weight:bold;">Total geral</td>
+                <td style="text-align:right;">
+                  <span style="font-size:11px; color:#777;">A prazo:</span>
+                  <strong style="font-size:13.5px; color:#333;">${money(o.totalGeralPrazo)}</strong>
+                  &nbsp;&nbsp;
+                  <span style="font-size:11px; color:#777;">À vista:</span>
+                  <strong style="font-size:15px; color:#90268F;">${money(o.totalGeralAvista)}</strong>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
 
-      <div style="background:#F7F3E9; border:1px solid #E3DCC8; border-radius:10px; padding:14px 18px; font-size:11px; line-height:1.6; color:#4a4a3a; margin-bottom:14px;">
+      <div style="border:1px solid #E3DCC8; border-radius:6px; padding:12px 16px; font-size:10.5px; line-height:1.6; color:#4a4a3a; margin-bottom:12px;">
         <strong style="color:#6B1C6B;">Condições de pagamento</strong><br>
         ${TEXTO_PAGAMENTO.join(' ')}
       </div>
 
-      <div style="background:#F5F2F0; border:1px solid #E0DAD5; border-radius:10px; padding:14px 18px; font-size:9.5px; line-height:1.65; color:#5a5a5a;">
-        <strong style="color:#6B1C6B; font-size:11px;">Termos e Condições</strong>
+      <div style="border:1px solid #E0DAD5; border-radius:6px; padding:12px 16px; font-size:9px; line-height:1.6; color:#5a5a5a;">
+        <strong style="color:#6B1C6B; font-size:10.5px;">Termos e Condições</strong>
         ${TERMOS.map(t=>`<div style="margin-top:4px;">${t}</div>`).join('')}
       </div>
 
-      ${o.imagem? `<div style="margin-top:20px; text-align:center; page-break-inside:avoid;">
-        <div style="font-size:11.5px; font-weight:bold; color:#6B1C6B; margin-bottom:8px;">Imagem Ilustrativa</div>
-        <img src="${o.imagem}" style="max-width:70%; max-height:340px; border-radius:10px; border:1px solid #E7C9E6;">
+      ${o.imagem? `<div style="margin-top:18px; text-align:center; page-break-inside:avoid;">
+        <div style="font-size:11px; font-weight:bold; color:#6B1C6B; margin-bottom:8px;">Imagem Ilustrativa</div>
+        <img src="${o.imagem}" style="max-width:70%; max-height:340px; border-radius:6px; border:1px solid #E3D3E2;">
       </div>` : ''}
 
-      <div style="margin-top:36px; display:flex; justify-content:space-between; font-size:11px;">
-        <div>_____________________________<br>Vendedor(a)${o.vendedor? ': '+o.vendedor : ''}</div>
-        <div>_____________________________<br>Cliente</div>
-      </div>
+      <table style="width:100%; border-collapse:collapse; margin-top:34px; font-size:11px;">
+        <tr>
+          <td style="width:50%;">_____________________________<br>Vendedor(a)${o.vendedor? ': '+o.vendedor : ''}</td>
+          <td style="width:50%;">_____________________________<br>Cliente</td>
+        </tr>
+      </table>
 
       <div style="text-align:center; font-size:9px; color:#8a8a8a; margin-top:26px; border-top:1px solid #e6e6e6; padding-top:10px;">
         <div>Razão social: E C DECORAÇÕES EIRELI ME &nbsp;&nbsp; Nome Fantasia: AMBIENTE DECORAÇÕES</div>
@@ -1302,6 +1425,15 @@ function imprimirOrcamento(id){
 /* ---------------------------------------------------------------
    ORÇAMENTOS SALVOS
 --------------------------------------------------------------- */
+function excluirOrcamento(id){
+  const o = DB.orcamentos.find(x=>x.id===id);
+  if(!o) return;
+  if(!confirm(`Excluir o orçamento de "${o.cliente}"? Essa ação não pode ser desfeita.`)) return;
+  DB.orcamentos = DB.orcamentos.filter(x=>x.id!==id);
+  saveDB();
+  renderOrcamentos();
+}
+
 function renderOrcamentos(){
   const el = document.getElementById('orclist');
   if(!DB.orcamentos.length){
@@ -1320,6 +1452,7 @@ function renderOrcamentos(){
         <div class="val">${money(o.totalGeralPrazo)} <span style="font-size:11px; color:var(--ink-soft); font-weight:400;">(à vista ${money(o.totalGeralAvista)})</span></div>
         <button class="btn small ghost" onclick="imprimirOrcamentoCliente('${raw.id}')">Cliente</button>
         <button class="btn small ghost" onclick="imprimirOrcamentoProducao('${raw.id}')">Produção</button>
+        <button class="del-btn" onclick="excluirOrcamento('${raw.id}')">excluir</button>
       </div>
     </div>`;
   }).join('');
